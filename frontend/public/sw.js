@@ -3,7 +3,7 @@
  * Provides offline caching for application shell, emergency shelters, and survival guides.
  */
 
-const CACHE_NAME = 'ner-safety-cache-v1';
+const CACHE_NAME = 'ner-safety-cache-v2';
 
 const STATIC_PRECACHE_URLS = [
   '/',
