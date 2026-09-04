@@ -147,6 +147,13 @@ class AutomaticSatellitePairService:
 
         # Choose the best pair (smallest score/closest repeat cycle)
         paired_candidates.sort(key=lambda x: x["score"])
+
+        from app.core.config import settings
+        if not settings.CDSE_S3_ACCESS_KEY or not settings.CDSE_S3_SECRET_KEY:
+            return {
+                "status": "CREDENTIALS_REQUIRED",
+                "message": "Copernicus S3 credentials are not configured in this environment. Configure CDSE_S3_ACCESS_KEY and CDSE_S3_SECRET_KEY in backend environment variables to enable live Sentinel-1 SAR change calculations."
+            }
         
         last_error = None
         for selected_pair in paired_candidates:

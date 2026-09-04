@@ -832,10 +832,10 @@ def extract_point_terrain(latitude: float, longitude: float) -> dict:
         raise ValueError(f"Extracted elevation window shape {elev_window.shape} is invalid.")
         
     elev = float(elev_window[1, 1])
-    if elev == nodata_val or np.isnan(elev) or elev < -500.0:
-        raise ValueError(f"Point coordinate contains NoData or invalid elevation values.")
+    if elev == nodata_val or np.isnan(elev) or elev < -500.0 or elev > 9000.0 or elev > 1e30:
+        raise ValueError(f"Point coordinate contains NoData or invalid elevation values ({elev}m).")
         
-    if np.any(elev_window == nodata_val) or np.any(np.isnan(elev_window)):
+    if np.any(elev_window == nodata_val) or np.any(np.isnan(elev_window)) or np.any(elev_window < -500.0) or np.any(elev_window > 9000.0) or np.any(elev_window > 1e30):
         raise ValueError(f"Neighboring pixels contain NoData or invalid values; cannot compute derivatives.")
         
     # Spacing calculations
