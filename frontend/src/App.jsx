@@ -663,6 +663,12 @@ function App() {
       if (result.ok) {
         setSatelliteChangeData(result.data)
         console.log('[Satellite Change Response] Received change data:', result.data)
+      } else if (result.data?.status === 'CREDENTIALS_REQUIRED' || (result.error && (result.error.includes('Copernicus S3 Credentials') || result.error.includes('CDSE_S3')))) {
+        setSatelliteChangeData({
+          status: 'CREDENTIALS_REQUIRED',
+          message: 'Live Sentinel-1 SAR imagery requires Copernicus CDSE S3 credentials. To enable radar change detection, add CDSE_S3_ACCESS_KEY and CDSE_S3_SECRET_KEY in backend settings. System continues operating in meteorological and AI terrain mode.'
+        })
+        setSatelliteChangeError(null)
       } else {
         setSatelliteChangeError(result.error || 'Satellite change analysis is currently unavailable.')
         console.error('[Satellite Change Error] Mapped error:', result.error)

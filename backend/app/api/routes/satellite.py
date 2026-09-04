@@ -335,6 +335,12 @@ def analyze_automatic_satellite_change(payload: AutomaticSatelliteChangeRequest)
             detail=str(e)
         )
     except Exception as e:
+        err_msg = str(e)
+        if "Copernicus S3 Credentials" in err_msg or "CDSE_S3" in err_msg:
+            return {
+                "status": "CREDENTIALS_REQUIRED",
+                "message": "Copernicus S3 credentials are not configured in this environment. To enable live Sentinel-1 SAR radar change calculations, configure CDSE_S3_ACCESS_KEY and CDSE_S3_SECRET_KEY in backend environment variables."
+            }
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Automatic satellite change analysis failed: {str(e)}"
