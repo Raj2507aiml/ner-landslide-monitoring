@@ -182,6 +182,30 @@ VERIFIED_EMERGENCY_FACILITIES = [
         "description": "Largest super-specialty disaster referral hospital in North East India with 24/7 multi-organ trauma suites."
     },
     {
+        "id": "HOSP-ASM-04",
+        "name": "Diphu Medical College & Hospital",
+        "type": "HOSPITAL",
+        "lat": 25.8500,
+        "lng": 93.4300,
+        "phone": "+91 3671 274444 / 108",
+        "state": "Assam",
+        "district": "Karbi Anglong",
+        "corridor": "Karbi Anglong Hill Corridor",
+        "description": "Apex district medical college & hospital with 24/7 emergency trauma casualty and ICU."
+    },
+    {
+        "id": "HOSP-ASM-05",
+        "name": "B.P. Civil Hospital Nagaon",
+        "type": "HOSPITAL",
+        "lat": 26.3450,
+        "lng": 92.6850,
+        "phone": "+91 3672 233222 / 108",
+        "state": "Assam",
+        "district": "Nagaon",
+        "corridor": "Central Assam Highway Axis",
+        "description": "Major district civil hospital with critical trauma ward and regional emergency ambulances."
+    },
+    {
         "id": "HOSP-NAG-01",
         "name": "Naga Hospital Authority Kohima (NHAK)",
         "type": "HOSPITAL",
@@ -330,6 +354,18 @@ VERIFIED_EMERGENCY_FACILITIES = [
         "description": "Hilltop safe zone facility equipped by Dima Hasao DDMA for displaced families."
     },
     {
+        "id": "SHELTER-ASM-02",
+        "name": "Diphu Indoor Stadium Relief Muster Center",
+        "type": "SHELTER",
+        "lat": 25.8480,
+        "lng": 93.4320,
+        "phone": "+91 3671 272222 / 1077",
+        "state": "Assam",
+        "district": "Karbi Anglong",
+        "corridor": "Karbi Anglong District HQ",
+        "description": "Centrally located concrete relief shelter equipped with emergency dry ration storage."
+    },
+    {
         "id": "SHELTER-NAG-01",
         "name": "Kohima Local Ground & Indoor Evacuation Center",
         "type": "SHELTER",
@@ -418,6 +454,18 @@ VERIFIED_EMERGENCY_FACILITIES = [
         "description": "Hill-district police unit monitoring railway and highway landslide disruption."
     },
     {
+        "id": "POL-ASM-02",
+        "name": "Diphu Police Station & Highway Patrol",
+        "type": "POLICE",
+        "lat": 25.8450,
+        "lng": 93.4350,
+        "phone": "+91 3671 272234 / 112",
+        "state": "Assam",
+        "district": "Karbi Anglong",
+        "corridor": "Karbi Anglong Central Hub",
+        "description": "District headquarters police unit coordinating rural landslide emergency dispatch."
+    },
+    {
         "id": "POL-NAG-01",
         "name": "Kohima North Police Station & NH-29 Patrol",
         "type": "POLICE",
@@ -492,6 +540,18 @@ VERIFIED_EMERGENCY_FACILITIES = [
         "district": "Dima Hasao",
         "corridor": "East-West Corridor (NH-27)",
         "description": "Heavy earthmoving contractors under NHAI standby contract for high-speed mudslide clearance."
+    },
+    {
+        "id": "BRO-ASM-02",
+        "name": "PWD / BRO Rapid Road Clearance Unit Diphu",
+        "type": "CLEARANCE_UNIT",
+        "lat": 25.8420,
+        "lng": 93.4280,
+        "phone": "+91 3671 272100 / 1070",
+        "state": "Assam",
+        "district": "Karbi Anglong",
+        "corridor": "Karbi Anglong Mountain Roads",
+        "description": "Dedicated hydraulic excavators and loaders stationed for hill road clearance across Karbi Anglong."
     }
 ]
 

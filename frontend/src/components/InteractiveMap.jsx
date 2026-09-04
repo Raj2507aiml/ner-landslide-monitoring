@@ -668,9 +668,14 @@ export default function InteractiveMap({
                   )}
 
                   {!isRoadLoading && !roadError && roadData && roadData.total_roads === 0 && (
-                    <p className="text-[var(--text-dim)] italic">
-                      No mapped roads found within the selected analysis area.
-                    </p>
+                    <div className="text-[var(--text-dim)] bg-[var(--subcard-bg)] border border-[var(--border-subtle)] p-2 rounded text-[8.5px] space-y-1">
+                      <p className="font-semibold text-[var(--text-muted)]">
+                        No mapped roads within 5 km radius.
+                      </p>
+                      <p className="text-[8px] leading-relaxed">
+                        This point is located in forested/wilderness terrain. Select a monitored corridor (e.g. ⚡ Hotspots &rarr; Sonapur NH-06) or click near an arterial highway to view live road connectivity.
+                      </p>
+                    </div>
                   )}
 
                   {!isRoadLoading && roadData && roadData.total_roads > 0 && (
