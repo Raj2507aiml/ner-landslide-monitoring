@@ -9,15 +9,19 @@ export function getApiBaseUrl() {
   }
 
   if (typeof window !== 'undefined') {
-    // In production builds or when served via reverse proxy on standard HTTP/HTTPS ports (80, 443),
-    // use relative '/api' to prevent exposing ports or internal backend IPs.
+    const hostname = window.location.hostname || '';
+    // On Render deployment: route directly to the live backend API service
+    if (hostname.includes('onrender.com')) {
+      return 'https://ner-landslide-api-raj2507.onrender.com/api';
+    }
+
+    // In production builds behind a reverse proxy, use relative '/api'
     const isStandardPort = window.location.port === '' || window.location.port === '80' || window.location.port === '443';
     if (import.meta.env.PROD || isStandardPort) {
       return '/api';
     }
 
-    const hostname = window.location.hostname || '127.0.0.1';
-    return `http://${hostname}:8000/api`;
+    return `http://${hostname || '127.0.0.1'}:8000/api`;
   }
   return 'http://127.0.0.1:8000/api';
 }
@@ -28,13 +32,17 @@ export function getMediaBaseUrl() {
   }
 
   if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname || '';
+    if (hostname.includes('onrender.com')) {
+      return 'https://ner-landslide-api-raj2507.onrender.com';
+    }
+
     const isStandardPort = window.location.port === '' || window.location.port === '80' || window.location.port === '443';
     if (import.meta.env.PROD || isStandardPort) {
       return '';
     }
 
-    const hostname = window.location.hostname || '127.0.0.1';
-    return `http://${hostname}:8000`;
+    return `http://${hostname || '127.0.0.1'}:8000`;
   }
   return 'http://127.0.0.1:8000';
 }
@@ -46,7 +54,6 @@ export function getMediaBaseUrl() {
 export async function apiFetch(endpoint, options = {}) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   
-  // Strategy 1: Direct call using current window.location.hostname
   const primaryBase = getApiBaseUrl();
   const primaryUrl = `${primaryBase}${cleanEndpoint}`;
 
@@ -54,25 +61,18 @@ export async function apiFetch(endpoint, options = {}) {
     const res = await fetch(primaryUrl, options);
     return res;
   } catch (primaryErr) {
-    // Strategy 2: Try explicit IPv4 127.0.0.1 or localhost fallback
-    const fallbackHost = (typeof window !== 'undefined' && window.location.hostname === '127.0.0.1')
-      ? 'localhost'
-      : '127.0.0.1';
-    const fallbackUrl = `http://${fallbackHost}:8000/api${cleanEndpoint}`;
+    // Only attempt local host fallbacks when actually developing on localhost
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      const fallbackHost = (window.location.hostname === '127.0.0.1') ? 'localhost' : '127.0.0.1';
+      const fallbackUrl = `http://${fallbackHost}:8000/api${cleanEndpoint}`;
 
-    try {
-      const fallbackRes = await fetch(fallbackUrl, options);
-      return fallbackRes;
-    } catch (fallbackErr) {
-      // Strategy 3: Try relative dev proxy (/api/...)
       try {
-        const proxyUrl = `/api${cleanEndpoint}`;
-        const proxyRes = await fetch(proxyUrl, options);
-        return proxyRes;
-      } catch (proxyErr) {
-        // If all fallbacks failed, throw original error
+        const fallbackRes = await fetch(fallbackUrl, options);
+        return fallbackRes;
+      } catch (fallbackErr) {
         throw primaryErr;
       }
     }
+    throw primaryErr;
   }
 }
