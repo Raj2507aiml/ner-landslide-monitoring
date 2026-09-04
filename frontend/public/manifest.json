@@ -1,0 +1,19 @@
+{
+  "name": "NER Landslide Early Warning & Citizen Safety",
+  "short_name": "NER Safety",
+  "description": "Offline-resilient landslide risk monitoring, mountain shelters, first-aid, and 2G emergency SMS dispatch across North East India.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07100d",
+  "theme_color": "#059669",
+  "orientation": "portrait-primary",
+  "categories": ["weather", "utilities", "safety"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

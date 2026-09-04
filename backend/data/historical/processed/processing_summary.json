@@ -1,0 +1,94 @@
+{
+  "processing_timestamp": "2026-08-30T04:23:06.863010+00:00",
+  "schema_mapping": {
+    "GSI": {
+      "source_id": "OBJECTID",
+      "source_ref": "SLIDE_NO",
+      "latitude": "LATITUDE / Geometry Point Y",
+      "longitude": "LONGITUDE / Geometry Point X",
+      "state": "STATE",
+      "district": "DISTRICT",
+      "slide_name": "SLIDE_NAME",
+      "landslide_type": "MOVEMENT_TYPE",
+      "material": "MATERIAL_TYPE",
+      "trigger": "TRIGGERING",
+      "activity": "ACTIVITY",
+      "movement_rate": "MOVEMENT_RATE",
+      "geology": "GEOLOGY",
+      "geoscientific_cause": "GEOSCIENTIFIC_CAUSE",
+      "persons_death": "PERSONS_DEATH",
+      "people_affected": "PEOPLE_AFFECTED",
+      "infrastructure_affected": "INFRASTRUCTURE_AFFECTED",
+      "event_date": "None (always NULL)",
+      "temporal_precision": "None (always 'unknown')",
+      "location_accuracy": "None (always NULL)"
+    },
+    "NASA_GLC": {
+      "source_id": "event_id",
+      "source_ref": "OBJECTID or FID",
+      "latitude": "latitude",
+      "longitude": "longitude",
+      "state": "admin_divi",
+      "district": "None (always empty)",
+      "location_description": "location_d",
+      "landslide_type": "landslide_",
+      "trigger": "landslide1",
+      "event_date": "event_date (parsed to YYYY-MM-DD)",
+      "temporal_precision": "None (always 'day' for valid date)",
+      "fatalities": "fatality_c (cast to int)",
+      "injuries": "injury_cou (cast to int)",
+      "location_accuracy": "location_a",
+      "original_record_reference": "source_nam"
+    }
+  },
+  "datasets": {
+    "GSI": {
+      "dataset": "GSI",
+      "raw_record_count": 30842,
+      "ner_filtered_count": 8546,
+      "excluded_outside_ner": 22296,
+      "missing_coordinates": 0,
+      "invalid_coordinates": 0,
+      "duplicate_source_refs": 22,
+      "duplicate_coordinate_pairs": 739,
+      "has_event_date": false,
+      "state_counts": {
+        "arunachal pradesh": 1048,
+        "assam": 624,
+        "manipur": 1575,
+        "meghalaya": 865,
+        "mizoram": 2042,
+        "nagaland": 1632,
+        "sikkim": 693,
+        "tripura": 67
+      },
+      "output_file": "gsi_ner_standardized.geojson"
+    },
+    "NASA_GLC": {
+      "dataset": "NASA_GLC",
+      "raw_record_count": 13494,
+      "ner_filtered_count": 488,
+      "excluded_outside_ner": 13006,
+      "missing_coordinates": 0,
+      "invalid_coordinates": 0,
+      "missing_dates": 0,
+      "invalid_dates": 0,
+      "date_range_min": "1970-01-01",
+      "date_range_max": "2018-06-05",
+      "duplicate_source_ids": 0,
+      "duplicate_coordinate_pairs": 0,
+      "has_event_date": true,
+      "state_counts": {
+        "arunachal pradesh": 73,
+        "assam": 93,
+        "manipur": 102,
+        "meghalaya": 35,
+        "mizoram": 40,
+        "nagaland": 87,
+        "sikkim": 50,
+        "tripura": 8
+      },
+      "output_file": "nasa_glc_ner_standardized.csv"
+    }
+  }
+}

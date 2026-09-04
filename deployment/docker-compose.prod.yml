@@ -1,0 +1,48 @@
+# ==============================================================================
+# Production Docker Compose for NER Landslide Risk Monitoring Platform
+# Architecture:
+#   - Frontend (Nginx) on Port 80/443 (Public facing)
+#   - Backend (FastAPI) on internal isolated network (ZERO exposed host ports)
+# ==============================================================================
+version: '3.8'
+
+services:
+  # 1. FastAPI Scientific Backend (Private & Shielded)
+  backend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.backend
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - PROJECT_NAME=NER Landslide Monitoring System API
+      - AUTH_SECRET_KEY=${AUTH_SECRET_KEY:-ner-secure-jwt-key-sih-2026}
+      - CDSE_S3_ACCESS_KEY=${CDSE_S3_ACCESS_KEY:-}
+      - CDSE_S3_SECRET_KEY=${CDSE_S3_SECRET_KEY:-}
+      - DATABASE_URL=sqlite:///./data/landslide_monitoring.db
+    volumes:
+      - ner_backend_data:/app/data
+    networks:
+      - ner_internal_net
+    # NOTICE: No 'ports' section here! Port 8000 is NEVER exposed to the public host.
+
+  # 2. React SPA Frontend & Nginx Secure Gateway
+  frontend:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.frontend
+    restart: always
+    ports:
+      - "80:80"
+      # - "443:443" # Uncomment if mounting SSL certificates directly
+    depends_on:
+      - backend
+    networks:
+      - ner_internal_net
+
+networks:
+  ner_internal_net:
+    driver: bridge
+
+volumes:
+  ner_backend_data:

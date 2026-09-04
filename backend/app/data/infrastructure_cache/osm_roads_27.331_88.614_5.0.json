@@ -1,0 +1,48 @@
+{
+  "timestamp": 1788377942.9600084,
+  "count": 2,
+  "roads": [
+    {
+      "osm_id": "501",
+      "name": "NH-10 Highway",
+      "ref": "NH10",
+      "highway_type": "primary",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            88.61,
+            27.33
+          ],
+          [
+            88.614,
+            27.332
+          ],
+          [
+            88.618,
+            27.335
+          ]
+        ]
+      }
+    },
+    {
+      "osm_id": "502",
+      "name": "Melli-Gangtok Road",
+      "ref": null,
+      "highway_type": "secondary",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            88.62,
+            27.34
+          ],
+          [
+            88.625,
+            27.345
+          ]
+        ]
+      }
+    }
+  ]
+}

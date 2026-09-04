@@ -1,0 +1,67 @@
+{
+  "timestamp": 1788290293.2056358,
+  "count": 3,
+  "roads": [
+    {
+      "osm_id": "201",
+      "name": "NH-10 Highway",
+      "ref": "NH10",
+      "highway_type": "primary",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            88.61,
+            27.33
+          ],
+          [
+            88.614,
+            27.332
+          ],
+          [
+            88.618,
+            27.335
+          ]
+        ]
+      }
+    },
+    {
+      "osm_id": "202",
+      "name": "Gangtok-Nathula Arterial",
+      "ref": null,
+      "highway_type": "secondary",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            88.62,
+            27.34
+          ],
+          [
+            88.625,
+            27.345
+          ]
+        ]
+      }
+    },
+    {
+      "osm_id": "203",
+      "name": null,
+      "ref": null,
+      "highway_type": "residential",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            88.6,
+            27.32
+          ],
+          [
+            88.602,
+            27.322
+          ]
+        ]
+      }
+    }
+  ]
+}

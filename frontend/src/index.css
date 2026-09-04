@@ -1,0 +1,145 @@
+@import "tailwindcss";
+
+:root, :root[data-theme="dark"], :root.dark, [data-theme="dark"], .dark {
+  --canvas-bg: #060e0a;
+  --panel-bg: rgba(9, 19, 14, 0.86);
+  --card-bg: rgba(11, 23, 17, 0.84);
+  --subcard-bg: rgba(6, 13, 9, 0.90);
+  --border-subtle: rgba(30, 54, 38, 0.75);
+  --border-strong: rgba(45, 80, 58, 0.85);
+  --text-main: #f2f7f4;
+  --text-muted: #9ab0a3;
+  --text-dim: #60786b;
+  --header-bg: rgba(7, 15, 11, 0.88);
+  --sidebar-bg: rgba(6, 13, 9, 0.92);
+  --sidebar-active-bg: rgba(20, 42, 30, 0.95);
+  --sidebar-active-border: rgba(42, 86, 60, 1);
+  --sidebar-active-text: #4ade80;
+  --metric-bg: rgba(9, 20, 15, 0.86);
+  --overlay-backdrop: rgba(5, 12, 8, 0.80);
+  --modal-bg: #091510;
+  --modal-header-bg: rgba(8, 17, 12, 0.95);
+  --modal-footer-bg: rgba(6, 13, 9, 0.95);
+  --map-bg: #07100d;
+  --scrollbar-track: #050a07;
+  --scrollbar-thumb: #18281f;
+  --scrollbar-thumb-hover: #233d2f;
+  --bg-gradient-vignette: radial-gradient(ellipse at 50% 20%, rgba(10, 26, 18, 0.25) 0%, rgba(7, 16, 12, 0.58) 55%, rgba(4, 9, 7, 0.86) 100%);
+  --bg-image-opacity: 0.50;
+}
+
+:root[data-theme="light"], :root.light, [data-theme="light"], .light {
+  --canvas-bg: #eef3ef;
+  --panel-bg: rgba(255, 255, 255, 0.98);
+  --card-bg: rgba(255, 255, 255, 0.98);
+  --subcard-bg: rgba(245, 250, 246, 0.98);
+  --border-subtle: rgba(200, 215, 205, 0.85);
+  --border-strong: rgba(165, 185, 170, 0.95);
+  --text-main: #101c15;
+  --text-muted: #43564b;
+  --text-dim: #6d8275;
+  --header-bg: rgba(255, 255, 255, 0.98);
+  --sidebar-bg: rgba(248, 252, 249, 0.98);
+  --sidebar-active-bg: rgba(218, 238, 223, 0.95);
+  --sidebar-active-border: rgba(120, 170, 136, 1);
+  --sidebar-active-text: #14532d;
+  --metric-bg: rgba(255, 255, 255, 0.98);
+  --overlay-backdrop: rgba(230, 238, 231, 0.82);
+  --modal-bg: #ffffff;
+  --modal-header-bg: rgba(245, 250, 246, 0.98);
+  --modal-footer-bg: rgba(239, 246, 240, 0.98);
+  --map-bg: #e2e8e2;
+  --scrollbar-track: #e5ebe5;
+  --scrollbar-thumb: #c2cdc3;
+  --scrollbar-thumb-hover: #9eaea0;
+  --bg-gradient-vignette: radial-gradient(ellipse at 50% 20%, rgba(246, 250, 247, 0.82) 0%, rgba(235, 244, 237, 0.90) 55%, rgba(218, 232, 222, 0.96) 100%);
+  --bg-image-opacity: 0.35;
+}
+
+@layer base {
+  body {
+    background-color: var(--canvas-bg);
+    color: var(--text-main);
+    overflow-x: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Custom command center scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+}
+
+/* Operational Command Center Glass/Surface Utilities */
+.command-panel {
+  background-color: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+}
+
+.command-card {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+}
+
+.command-subcard {
+  background-color: var(--subcard-bg);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+}
+
+/* Map Tile Filtering for Dark and Light Modes */
+.dark .leaflet-tile, [data-theme="dark"] .leaflet-tile {
+  filter: invert(1) hue-rotate(180deg) brightness(92%) contrast(92%);
+}
+
+.light .leaflet-tile, [data-theme="light"] .leaflet-tile {
+  filter: contrast(100%) brightness(98%);
+}
+
+.dark .leaflet-container, [data-theme="dark"] .leaflet-container {
+  background: #08100c !important;
+}
+
+.light .leaflet-container, [data-theme="light"] .leaflet-container {
+  background: #e2e8e2 !important;
+}
+
+.dark .leaflet-popup-content-wrapper, [data-theme="dark"] .leaflet-popup-content-wrapper {
+  background: #07100d !important;
+  color: #f1f5f3 !important;
+  border: 1px solid #1a2d21 !important;
+  border-radius: 8px !important;
+}
+
+.light .leaflet-popup-content-wrapper, [data-theme="light"] .leaflet-popup-content-wrapper {
+  background: #ffffff !important;
+  color: #121c17 !important;
+  border: 1px solid #cbd5cb !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark .leaflet-popup-tip, [data-theme="dark"] .leaflet-popup-tip {
+  background: #07100d !important;
+  border: 1px solid #1a2d21 !important;
+}
+
+.light .leaflet-popup-tip, [data-theme="light"] .leaflet-popup-tip {
+  background: #ffffff !important;
+  border: 1px solid #cbd5cb !important;
+}

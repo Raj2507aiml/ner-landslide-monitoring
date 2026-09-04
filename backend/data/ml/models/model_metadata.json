@@ -1,0 +1,336 @@
+{
+  "model_type": "Random Forest Classifier",
+  "feature_list": [
+    "elevation",
+    "slope",
+    "aspect_sin",
+    "aspect_cos"
+  ],
+  "dataset_sample_counts": {
+    "total_records": 16593,
+    "sikkim_holdout_records": 697,
+    "training_region_records": 15896
+  },
+  "spatial_block_details": {
+    "total_blocks": 128
+  },
+  "cross_validation_metrics": {
+    "logistic_regression": {
+      "roc_auc": {
+        "mean": 0.730467393980553,
+        "std": 0.015565151284263076
+      },
+      "pr_auc": {
+        "mean": 0.5062257513982356,
+        "std": 0.031323445438818
+      },
+      "recall": {
+        "mean": 0.306719040007095,
+        "std": 0.03640560028407408
+      },
+      "precision": {
+        "mean": 0.5622468447378558,
+        "std": 0.03548086844872394
+      },
+      "f1": {
+        "mean": 0.39607223874726066,
+        "std": 0.035811741394517156
+      },
+      "fpr": {
+        "mean": 0.11165277396203335,
+        "std": 0.008172054271012462
+      },
+      "fnr": {
+        "mean": 0.693280959992905,
+        "std": 0.036405600284074094
+      }
+    },
+    "random_forest": {
+      "roc_auc": {
+        "mean": 0.7984299081072403,
+        "std": 0.016872720593106894
+      },
+      "pr_auc": {
+        "mean": 0.5707913728642862,
+        "std": 0.03101516699686141
+      },
+      "recall": {
+        "mean": 0.8730937229203132,
+        "std": 0.041349215668802626
+      },
+      "precision": {
+        "mean": 0.511871157061912,
+        "std": 0.019268634817972995
+      },
+      "f1": {
+        "mean": 0.6448314522991112,
+        "std": 0.018889732701775575
+      },
+      "fpr": {
+        "mean": 0.3928253279985126,
+        "std": 0.04015825589536707
+      },
+      "fnr": {
+        "mean": 0.12690627707968682,
+        "std": 0.04134921566880261
+      }
+    }
+  },
+  "sikkim_holdout_metrics": {
+    "roc_auc": 0.9328351609480015,
+    "pr_auc": 0.9541154029605243,
+    "recall": 0.8,
+    "precision": 0.9617486338797814,
+    "f1": 0.8734491315136477,
+    "fpr": 0.054474708171206226,
+    "fnr": 0.2,
+    "confusion_matrix": [
+      243,
+      14,
+      88,
+      352
+    ]
+  },
+  "environment_metadata": {
+    "training_timestamp": "2026-08-30T14:34:28.482003Z",
+    "random_seed": 42,
+    "scikit_learn_version": "1.7.2"
+  },
+  "calibration": {
+    "selected_threshold": 0.49999999999999994,
+    "threshold_selection_method": "Recall >= 0.85, then minimize FPR, then maximize F1 on Spatial OOF CV predictions",
+    "default_threshold_metrics_oof": {
+      "recall": 0.8737711364530083,
+      "precision": 0.5116279069767442,
+      "f1": 0.645367412140575,
+      "fpr": 0.39241443108233115,
+      "confusion_matrix": [
+        6568,
+        4242,
+        642,
+        4444
+      ]
+    },
+    "calibrated_threshold_metrics_oof": {
+      "recall": 0.8737711364530083,
+      "precision": 0.5116279069767442,
+      "f1": 0.645367412140575,
+      "fpr": 0.39241443108233115,
+      "confusion_matrix": [
+        6568,
+        4242,
+        642,
+        4444
+      ]
+    },
+    "sikkim_holdout_evaluation": {
+      "evaluation_caveat": "Sikkim holdout scores are geographically inflated by northern high-altitude barren rock/ice regions, acting as a secondary stress test only.",
+      "metrics_at_default_0.50": {
+        "recall": 0.8,
+        "precision": 0.9617486338797814,
+        "fpr": 0.054474708171206226,
+        "confusion_matrix": [
+          243,
+          14,
+          88,
+          352
+        ]
+      },
+      "metrics_at_calibrated": {
+        "recall": 0.8,
+        "precision": 0.9617486338797814,
+        "fpr": 0.054474708171206226,
+        "confusion_matrix": [
+          243,
+          14,
+          88,
+          352
+        ]
+      }
+    },
+    "threshold_comparison_table": [
+      {
+        "threshold": 0.2,
+        "recall": 0.9591034211561148,
+        "precision": 0.4583724863747416,
+        "f1": 0.62029501525941,
+        "fpr": 0.5332099907493062,
+        "fnr": 0.04089657884388517,
+        "confusion_matrix": [
+          5046,
+          5764,
+          208,
+          4878
+        ]
+      },
+      {
+        "threshold": 0.25,
+        "recall": 0.9508454581203303,
+        "precision": 0.46851385390428213,
+        "f1": 0.6277258566978193,
+        "fpr": 0.5074930619796485,
+        "fnr": 0.04915454187966968,
+        "confusion_matrix": [
+          5324,
+          5486,
+          250,
+          4836
+        ]
+      },
+      {
+        "threshold": 0.3,
+        "recall": 0.9439638222571766,
+        "precision": 0.477473893585281,
+        "f1": 0.634172115448121,
+        "fpr": 0.4860314523589269,
+        "fnr": 0.056036177742823434,
+        "confusion_matrix": [
+          5556,
+          5254,
+          285,
+          4801
+        ]
+      },
+      {
+        "threshold": 0.35,
+        "recall": 0.9305937868659064,
+        "precision": 0.4845909695914815,
+        "f1": 0.6373123274759308,
+        "fpr": 0.4656799259944496,
+        "fnr": 0.06940621313409359,
+        "confusion_matrix": [
+          5776,
+          5034,
+          353,
+          4733
+        ]
+      },
+      {
+        "threshold": 0.39999999999999997,
+        "recall": 0.9182068423122296,
+        "precision": 0.4921488038781747,
+        "f1": 0.6408233276157804,
+        "fpr": 0.445790934320074,
+        "fnr": 0.08179315768777035,
+        "confusion_matrix": [
+          5991,
+          4819,
+          416,
+          4670
+        ]
+      },
+      {
+        "threshold": 0.44999999999999996,
+        "recall": 0.9030672434132914,
+        "precision": 0.5005448997384482,
+        "f1": 0.6440891880521666,
+        "fpr": 0.423959296947271,
+        "fnr": 0.09693275658670861,
+        "confusion_matrix": [
+          6227,
+          4583,
+          493,
+          4593
+        ]
+      },
+      {
+        "threshold": 0.49999999999999994,
+        "recall": 0.8737711364530083,
+        "precision": 0.5116279069767442,
+        "f1": 0.645367412140575,
+        "fpr": 0.39241443108233115,
+        "fnr": 0.12622886354699175,
+        "confusion_matrix": [
+          6568,
+          4242,
+          642,
+          4444
+        ]
+      },
+      {
+        "threshold": 0.5499999999999999,
+        "recall": 0.8375933936295714,
+        "precision": 0.5254718144813124,
+        "f1": 0.6457970135678011,
+        "fpr": 0.3558741905642923,
+        "fnr": 0.16240660637042864,
+        "confusion_matrix": [
+          6963,
+          3847,
+          826,
+          4260
+        ]
+      },
+      {
+        "threshold": 0.5999999999999999,
+        "recall": 0.7788045615414865,
+        "precision": 0.5422313483915127,
+        "f1": 0.6393350012105561,
+        "fpr": 0.3093432007400555,
+        "fnr": 0.22119543845851355,
+        "confusion_matrix": [
+          7466,
+          3344,
+          1125,
+          3961
+        ]
+      },
+      {
+        "threshold": 0.6499999999999999,
+        "recall": 0.6954384585135667,
+        "precision": 0.5608943862987631,
+        "f1": 0.6209620786516854,
+        "fpr": 0.25615171137835335,
+        "fnr": 0.30456154148643333,
+        "confusion_matrix": [
+          8041,
+          2769,
+          1549,
+          3537
+        ]
+      },
+      {
+        "threshold": 0.7,
+        "recall": 0.5163193079040503,
+        "precision": 0.5874720357941835,
+        "f1": 0.5496023440770197,
+        "fpr": 0.17058279370952822,
+        "fnr": 0.48368069209594966,
+        "confusion_matrix": [
+          8966,
+          1844,
+          2460,
+          2626
+        ]
+      },
+      {
+        "threshold": 0.7499999999999998,
+        "recall": 0.017499016909162408,
+        "precision": 0.5527950310559007,
+        "f1": 0.0339241471316943,
+        "fpr": 0.0066604995374653095,
+        "fnr": 0.9825009830908376,
+        "confusion_matrix": [
+          10738,
+          72,
+          4997,
+          89
+        ]
+      },
+      {
+        "threshold": 0.7999999999999998,
+        "recall": 0.0,
+        "precision": 0.0,
+        "f1": 0.0,
+        "fpr": 0.0,
+        "fnr": 1.0,
+        "confusion_matrix": [
+          10810,
+          0,
+          5086,
+          0
+        ]
+      }
+    ]
+  }
+}
