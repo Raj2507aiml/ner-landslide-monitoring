@@ -14,7 +14,8 @@ from app.api.routes import (
     infrastructure,
     operations,
     incidents,
-    auth
+    auth,
+    travel
 )
 
 api_router = APIRouter()
@@ -34,4 +35,7 @@ api_router.include_router(field_reports.router, prefix="/v1/field-reports", tags
 api_router.include_router(infrastructure.router, prefix="/v1/infrastructure", tags=["infrastructure"])
 api_router.include_router(operations.router, prefix="/v1/operations", tags=["operations"])
 api_router.include_router(incidents.router, prefix="/v1/incidents", tags=["incidents"])
+api_router.include_router(travel.router, prefix="/v1/travel", tags=["travel"])
+api_router.include_router(travel.router, prefix="/travel", tags=["travel"])
+
 

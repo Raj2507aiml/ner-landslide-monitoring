@@ -1,10 +1,61 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Rectangle, Tooltip, Popup, useMapEvents, ImageOverlay, Polyline } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Rectangle, Tooltip, Popup, useMapEvents, ImageOverlay, Polyline, Circle } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import LocationSearchBar from './LocationSearchBar'
 import { computeNearestFacilities, isCoordinateInNER } from '../services/emergencyFacilitiesData'
 import { getApiBaseUrl } from '../services/apiConfig'
+
+// Custom pulsing SVG marker icon representing live traveler GPS position
+const travelerVehicleIcon = new L.DivIcon({
+  className: 'traveler-vehicle-icon',
+  html: `
+    <div class="relative flex items-center justify-center">
+      <span class="absolute inline-flex h-9 w-9 animate-ping rounded-full bg-sky-500 opacity-60"></span>
+      <div class="relative rounded-full h-7 w-7 bg-sky-600 border-2 border-white shadow-xl flex items-center justify-center text-white text-xs font-bold">
+        🚗
+      </div>
+    </div>
+  `,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16]
+})
+
+// Custom marker icon representing travel destination
+const destinationPinIcon = new L.DivIcon({
+  className: 'destination-pin-icon',
+  html: `
+    <div class="relative flex items-center justify-center">
+      <div class="rounded-full h-6 w-6 bg-purple-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold">
+        🏁
+      </div>
+    </div>
+  `,
+  iconSize: [26, 26],
+  iconAnchor: [13, 13]
+})
+
+// Custom marker icon for travel danger corridors with animated warning badge
+const getDangerZoneIcon = (zone, isActiveAlert) => {
+  const isCritical = (zone.risk_probability || 0) >= 85 || zone.severity === 'CRITICAL'
+  const bgColor = isCritical ? 'bg-rose-600' : 'bg-amber-600'
+  const pingColor = isCritical ? 'bg-rose-500' : 'bg-amber-500'
+  const pingClass = isActiveAlert ? 'h-10 w-10 opacity-90' : 'h-6 w-6 opacity-40'
+
+  return new L.DivIcon({
+    className: 'danger-zone-marker',
+    html: `
+      <div class="relative flex items-center justify-center">
+        <span class="absolute inline-flex ${pingClass} animate-ping rounded-full ${pingColor}"></span>
+        <div class="relative rounded-full h-6 w-6 ${bgColor} border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold">
+          ⚠️
+        </div>
+      </div>
+    `,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13]
+  })
+}
 
 // Custom pulsing SVG marker icon representing selected location
 const selectedLocationIcon = new L.DivIcon({
@@ -235,7 +286,12 @@ export default function InteractiveMap({
   isRoadLoading = false,
   roadError = null,
   showRoads = true,
-  setShowRoads = () => {}
+  setShowRoads = () => {},
+  travelMonitoringActive = false,
+  travelerLocation = null,
+  travelDestination = null,
+  travelRiskZones = [],
+  activeTravelAlert = null
 }) {
   // Geographic center of the North Eastern Region (NER) of India
   const centerNER = [26.2006, 92.5000] // Guwahati, Assam area
@@ -1191,6 +1247,151 @@ export default function InteractiveMap({
               Analysis Area ({aoi.radius_km} km)
             </Tooltip>
           </Rectangle>
+        )}
+
+        {/* ======================================================== */}
+        {/* TRAVEL SAFETY LAYERS (Route, Vehicle, Hazard Perimeters) */}
+        {/* ======================================================== */}
+        {travelMonitoringActive && (
+          <>
+            {/* Navigational Route to Destination */}
+            {travelerLocation && travelDestination && travelDestination.lat != null && (
+              <Polyline
+                positions={[
+                  [travelerLocation.lat, travelerLocation.lng],
+                  [travelDestination.lat, travelDestination.lng]
+                ]}
+                pathOptions={{
+                  color: '#0284c7',
+                  weight: 4.5,
+                  dashArray: '8, 6',
+                  opacity: 0.85
+                }}
+              >
+                <Tooltip sticky>
+                  Travel Route: To {travelDestination.name || 'Destination'}
+                </Tooltip>
+              </Polyline>
+            )}
+
+            {/* Destination Marker */}
+            {travelDestination && travelDestination.lat != null && (
+              <Marker
+                position={[travelDestination.lat, travelDestination.lng]}
+                icon={destinationPinIcon}
+              >
+                <Popup>
+                  <div className="text-[var(--text-main)] text-xs p-1 space-y-1">
+                    <div className="font-bold text-purple-600 dark:text-purple-400 border-b border-[var(--border-subtle)] pb-1 flex items-center gap-1.5">
+                      <span>🏁 Planned Destination</span>
+                    </div>
+                    <p className="font-semibold text-[var(--text-main)]">{travelDestination.name || 'Selected Destination'}</p>
+                    <p className="font-mono text-[10px] text-[var(--text-dim)]">
+                      {travelDestination.lat.toFixed(4)}°N, {travelDestination.lng.toFixed(4)}°E
+                    </p>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+
+            {/* Monitored Travel Hazard Corridors & 10 km Early Warning Perimeter */}
+            {(travelRiskZones || []).map((zone) => {
+              const isZoneActiveAlert = activeTravelAlert?.zone?.id === zone.id
+              const isCritical = (zone.risk_probability || 0) >= 85 || zone.severity === 'CRITICAL'
+              const circleColor = isZoneActiveAlert ? '#ef4444' : isCritical ? '#f43f5e' : '#f59e0b'
+
+              return (
+                <span key={`travel-hazard-${zone.id}`}>
+                  {/* 10 km Early Warning Perimeter Buffer */}
+                  {(zone.risk_probability || 0) >= 70 && (
+                    <Circle
+                      center={[zone.latitude, zone.longitude]}
+                      radius={10000}
+                      pathOptions={{
+                        color: circleColor,
+                        fillColor: circleColor,
+                        fillOpacity: isZoneActiveAlert ? 0.22 : 0.08,
+                        weight: isZoneActiveAlert ? 2.5 : 1.2,
+                        dashArray: isZoneActiveAlert ? '4, 4' : '6, 6'
+                      }}
+                    >
+                      <Tooltip permanent={isZoneActiveAlert} direction="top" className="custom-tooltip">
+                        {isZoneActiveAlert ? `🚨 10 km Early Warning Active: ${zone.name}` : `10 km Buffer: ${zone.name}`}
+                      </Tooltip>
+                    </Circle>
+                  )}
+
+                  {/* Hazard Center Marker */}
+                  <Marker
+                    position={[zone.latitude, zone.longitude]}
+                    icon={getDangerZoneIcon(zone, isZoneActiveAlert)}
+                  >
+                    <Popup>
+                      <div className="text-[var(--text-main)] text-xs p-1 space-y-1.5 min-w-[210px]">
+                        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-1">
+                          <span className="font-bold text-rose-600 dark:text-rose-400">⚠️ Landslide Hazard Zone</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            isCritical ? 'bg-rose-500/20 text-rose-500' : 'bg-amber-500/20 text-amber-500'
+                          }`}>
+                            {zone.risk_probability}% Risk
+                          </span>
+                        </div>
+                        <p className="font-bold text-sm text-[var(--text-main)]">{zone.name}</p>
+                        {zone.highway && (
+                          <div className="text-[11px] text-[var(--text-muted)]">
+                            <span className="font-semibold text-[var(--text-dim)]">Highway: </span>
+                            <span className="font-mono">{zone.highway}</span>
+                          </div>
+                        )}
+                        {zone.advisory && (
+                          <p className="text-[11px] text-[var(--text-dim)] bg-[var(--card-bg)] p-1.5 rounded border border-[var(--border-subtle)]">
+                            {zone.advisory}
+                          </p>
+                        )}
+                        <div className="font-mono text-[9px] text-[var(--text-dim)] pt-1 border-t border-[var(--border-subtle)] flex justify-between">
+                          <span>Source: {zone.source || 'CompositeRiskEngine'}</span>
+                          <span>{zone.latitude.toFixed(4)}, {zone.longitude.toFixed(4)}</span>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                </span>
+              )
+            })}
+
+            {/* Live Traveler Vehicle Marker */}
+            {travelerLocation && travelerLocation.lat != null && (
+              <Marker
+                position={[travelerLocation.lat, travelerLocation.lng]}
+                icon={travelerVehicleIcon}
+                zIndexOffset={1000}
+              >
+                <Popup>
+                  <div className="text-[var(--text-main)] text-xs p-1 space-y-1 min-w-[180px]">
+                    <div className="font-bold text-sky-600 dark:text-sky-400 border-b border-[var(--border-subtle)] pb-1 flex items-center gap-1.5">
+                      <span>🚗 Traveler Position (Live GPS)</span>
+                    </div>
+                    <div className="font-mono text-xs text-[var(--text-main)] font-semibold">
+                      {travelerLocation.lat.toFixed(5)}°N, {travelerLocation.lng.toFixed(5)}°E
+                    </div>
+                    {travelerLocation.heading != null && !isNaN(travelerLocation.heading) && (
+                      <p className="text-[10px] text-[var(--text-dim)]">
+                        Bearing: <span className="font-mono font-bold">{Math.round(travelerLocation.heading)}°</span>
+                      </p>
+                    )}
+                    {travelerLocation.speed != null && !isNaN(travelerLocation.speed) && (
+                      <p className="text-[10px] text-[var(--text-dim)]">
+                        Speed: <span className="font-mono font-bold">{(travelerLocation.speed * 3.6).toFixed(1)} km/h</span>
+                      </p>
+                    )}
+                    <span className="inline-block text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                      ● Active Early Warning Corridor
+                    </span>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+          </>
         )}
       </MapContainer>
     </div>

@@ -5,7 +5,7 @@
  * Includes global mute/unmute persistence and session cooldown protection.
  */
 
-import { getLanguage, t } from './i18nService';
+import { getLanguage, t } from './i18nService.js';
 
 const MUTE_STORAGE_KEY = 'ner_emergency_audio_muted';
 const VOICE_STORAGE_KEY = 'ner_emergency_voice_enabled';
@@ -232,3 +232,99 @@ export function stopAllEmergencyAudio() {
     } catch {}
   }
 }
+
+let lastTravelAlertVoiceTimestamp = 0;
+const TRAVEL_VOICE_GLOBAL_COOLDOWN_MS = 20000; // 20s minimum between speech calls
+
+/**
+ * Dispatches an automated voice alert for travel route hazards.
+ * Plays EBS attention chime, then speaks the advisory dynamically with distance & risk percentage.
+ * 
+ * @param {Object} params
+ * @param {number} params.riskScore - Landslide risk percentage (e.g. 82)
+ * @param {number} params.distanceKm - Distance to hazard in km (e.g. 8.7)
+ * @param {string} params.regionName - Affected corridor or landmark name
+ * @param {boolean} params.isUrgent - True if approaching close (<= 5 km)
+ * @param {boolean} params.force - If true, bypasses cooldown (used for manual test)
+ */
+export function playTravelSafetyVoiceAlert({
+  riskScore = 75,
+  distanceKm = 9.0,
+  regionName = 'High-Risk Landslide Corridor',
+  isUrgent = false,
+  force = false
+} = {}) {
+  if (isAudioMuted() || !isVoiceEnabled()) {
+    return false;
+  }
+
+  const now = Date.now();
+  if (!force && (now - lastTravelAlertVoiceTimestamp) < TRAVEL_VOICE_GLOBAL_COOLDOWN_MS) {
+    return false;
+  }
+  lastTravelAlertVoiceTimestamp = now;
+
+  // 1. Play attention chime
+  playEmergencyAlertSound({
+    sectorKey: `travel_${regionName}`,
+    force: true
+  });
+
+  // 2. Synthesize dynamic voice warning
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    setTimeout(() => {
+      if (isAudioMuted() || !isVoiceEnabled()) return;
+      try {
+        window.speechSynthesis.cancel(); // Stop any pending speech
+        const roundedDistance = Math.max(1, Math.round(distanceKm));
+        const roundedRisk = Math.round(riskScore);
+        const currentLang = getLanguage();
+
+        let alertSpeech = "";
+        if (currentLang === 'hi') {
+          alertSpeech = isUrgent
+            ? `चेतावनी। आगे तीव्र भूस्खलन का खतरा है। आप ${regionName} से मात्र ${roundedDistance} किलोमीटर दूर हैं। अनुमानित जोखिम ${roundedRisk} प्रतिशत है। तुरंत सुरक्षित स्थान खोजें।`
+            : `चेतावनी। आगे उच्च भूस्खलन जोखिम क्षेत्र है। आप ${regionName} से लगभग ${roundedDistance} किलोमीटर की दूरी पर हैं। अनुमानित जोखिम ${roundedRisk} प्रतिशत है। कृपया वैकल्पिक मार्ग चुनें।`;
+        } else if (currentLang === 'bn') {
+          alertSpeech = `সতর্কবার্তা। সামনে উচ্চ ভূমিধসের ঝুঁকি। আপনি ${regionName} থেকে প্রায় ${roundedDistance} কিলোমিটার দূরে। আনুমানিক ঝুঁকি ${roundedRisk} শতাংশ। বিকল্প পথ ব্যবহার করুন।`;
+        } else if (currentLang === 'ne') {
+          alertSpeech = `चेतावनी। अगाडि पहिरोको उच्च जोखिम छ। तपाईं ${regionName} बाट लगभग ${roundedDistance} किलोमिटर टाढा हुनुहुन्छ। अनुमानित जोखिम ${roundedRisk} प्रतिशत छ। वैकल्पिक बाटो रोज्नुहोस्।`;
+        } else {
+          alertSpeech = isUrgent
+            ? `Warning. Critical landslide danger ahead. You are only ${roundedDistance} kilometers from ${regionName}. Estimated risk is ${roundedRisk} percent. Please seek immediate shelter or turn back.`
+            : `Warning. High landslide risk ahead. You are approximately ${roundedDistance} kilometers from ${regionName}. The estimated landslide risk is ${roundedRisk} percent. Please consider an alternative route and follow local safety advisories.`;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(alertSpeech);
+        utterance.rate = 0.92;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        if (currentLang === 'hi') utterance.lang = 'hi-IN';
+        else if (currentLang === 'bn') utterance.lang = 'bn-IN';
+        else if (currentLang === 'ne') utterance.lang = 'ne-NP';
+        else utterance.lang = 'en-IN';
+
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        console.warn('[Emergency Audio] Travel speech error:', err);
+      }
+    }, 1100);
+  }
+
+  return true;
+}
+
+/**
+ * Developer and SIH demo helper: Unconditionally triggers simulated travel voice warning.
+ */
+export function testTravelVoiceAlert() {
+  return playTravelSafetyVoiceAlert({
+    riskScore: 85,
+    distanceKm: 9.2,
+    regionName: 'Sonapur Tunnel Corridor (NH-06)',
+    isUrgent: false,
+    force: true
+  });
+}
+

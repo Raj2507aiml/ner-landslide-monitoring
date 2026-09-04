@@ -49,6 +49,7 @@ import LoginModal from './components/LoginModal'
 import AuthLandingPage from './components/AuthLandingPage'
 import UserRoleSelector from './components/UserRoleSelector'
 import CitizenAdvisoryCard from './components/CitizenAdvisoryCard'
+import TravelSafetyCard from './components/TravelSafetyCard'
 import ErrorBoundary from './components/ErrorBoundary'
 import EmergencySmsModal from './components/EmergencySmsModal'
 import { useOnlineStatus } from './hooks/useOnlineStatus'
@@ -222,6 +223,16 @@ function App() {
       setIsAudioMutedState(newMuted)
     })
   }, [])
+
+  // Travel Route Early Warning System State
+  const [travelSafetyState, setTravelSafetyState] = useState({
+    isMonitoring: false,
+    travelerLocation: null,
+    travelDestination: null,
+    riskZones: [],
+    activeAlert: null,
+    voiceAlertsActive: true
+  })
 
   // Satellite scene discovery states
   const [satelliteScenes, setSatelliteScenes] = useState([])
@@ -1480,6 +1491,11 @@ function App() {
                     roadError={roadError}
                     showRoads={showRoads}
                     setShowRoads={setShowRoads}
+                    travelMonitoringActive={travelSafetyState.isMonitoring}
+                    travelerLocation={travelSafetyState.travelerLocation}
+                    travelDestination={travelSafetyState.travelDestination}
+                    travelRiskZones={travelSafetyState.riskZones}
+                    activeTravelAlert={travelSafetyState.activeAlert}
                   />
                 </div>
 
@@ -1546,8 +1562,12 @@ function App() {
               </div>
             </section>
 
-            {/* Recent Alerts Column (1/3 width on large screens) */}
+            {/* Travel Safety & Recent Alerts Column (1/3 width on large screens) */}
             <section className="space-y-3">
+              <TravelSafetyCard
+                onLocateOnMap={(lat, lng) => setSelectedLocation({ lat, lng })}
+                onTravelStateChange={setTravelSafetyState}
+              />
               <RecentAlertsPanel
                 refreshKey={incidentRefreshKey}
                 onLocateIncident={(coords) => {
@@ -3260,9 +3280,20 @@ function App() {
                     roadError={roadError}
                     showRoads={showRoads}
                     setShowRoads={setShowRoads}
+                    travelMonitoringActive={travelSafetyState.isMonitoring}
+                    travelerLocation={travelSafetyState.travelerLocation}
+                    travelDestination={travelSafetyState.travelDestination}
+                    travelRiskZones={travelSafetyState.riskZones}
+                    activeTravelAlert={travelSafetyState.activeAlert}
                   />
                 </div>
               </div>
+
+              {/* Travel Route Landslide Early Warning Card (Citizen Safety Mode) */}
+              <TravelSafetyCard
+                onLocateOnMap={(lat, lng) => setSelectedLocation({ lat, lng })}
+                onTravelStateChange={setTravelSafetyState}
+              />
 
               {/* Citizen Advisory Details Card */}
               <ErrorBoundary onReset={() => handleLocationSelect(null)}>
