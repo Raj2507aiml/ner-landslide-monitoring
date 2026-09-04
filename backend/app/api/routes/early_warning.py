@@ -73,17 +73,12 @@ def analyze_early_warning(payload: EarlyWarningAnalysisRequest, db: Session = De
             detail=f"Composite hazard assessment failed during early warning evaluation: {str(e)}"
         )
 
-    # 3. Step B: Query Automatic Satellite Change Analysis
-    radar_change_data = None
-    try:
-        radar_change_data = AutomaticSatellitePairService.analyze_location_change(
-            latitude=payload.latitude,
-            longitude=payload.longitude,
-            radius_km=5.0
-        )
-    except Exception:
-        # Fall back to meteorological mode if satellite alignment fails
-        pass
+    # 3. Step B: Query Automatic Satellite Change Analysis (fast non-blocking cached lookup)
+    radar_change_data = AutomaticSatellitePairService.get_cached_analysis(
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        radius_km=5.0
+    )
 
     # 4. Step C: Run EarlyWarningService evaluation
     try:

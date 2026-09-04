@@ -61,6 +61,17 @@ export async function apiFetch(endpoint, options = {}) {
     const res = await fetch(primaryUrl, options);
     return res;
   } catch (primaryErr) {
+    // Retry once after a brief delay if on Render (handles cold starts & container swaps)
+    if (typeof window !== 'undefined' && window.location.hostname.includes('onrender.com')) {
+      try {
+        await new Promise(r => setTimeout(r, 1200));
+        const retryRes = await fetch(primaryUrl, options);
+        return retryRes;
+      } catch {
+        throw primaryErr;
+      }
+    }
+
     // Only attempt local host fallbacks when actually developing on localhost
     if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       const fallbackHost = (window.location.hostname === '127.0.0.1') ? 'localhost' : '127.0.0.1';
