@@ -105,14 +105,12 @@ class OperationalAssessmentService:
         if mock_radar_change_data is not None:
             radar_change_data = mock_radar_change_data
         else:
-            try:
-                radar_change_data = AutomaticSatellitePairService.analyze_location_change(
-                    latitude=latitude,
-                    longitude=longitude,
-                    radius_km=radius_km
-                )
-            except Exception:
-                radar_change_data = None
+            # Check cached radar analysis first to ensure immediate sub-second response
+            radar_change_data = AutomaticSatellitePairService.get_cached_analysis(
+                latitude=latitude,
+                longitude=longitude,
+                radius_km=radius_km
+            )
 
         ew_result = EarlyWarningService.evaluate_warning_status(
             composite_hazard_data=composite_hazard,

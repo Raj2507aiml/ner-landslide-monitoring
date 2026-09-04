@@ -6,6 +6,8 @@ for a given latitude, longitude, and radius, running change detection and RSCI.
 """
 
 import os
+import time
+import threading
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
@@ -13,9 +15,23 @@ from app.services.satellite_service import query_copernicus_stac, process_scene_
 from app.services.satellite_change_service import SatelliteChangeService
 from app.services.radar_change_signal_service import RadarChangeSignalService
 
+_satellite_analysis_cache: Dict[str, Any] = {}
+_satellite_analysis_lock = threading.Lock()
+
 class AutomaticSatellitePairService:
-    @staticmethod
+    @classmethod
+    def get_cached_analysis(cls, latitude: float, longitude: float, radius_km: float = 5.0) -> Optional[Dict[str, Any]]:
+        """Returns non-expired cached analysis result for coordinates, or None."""
+        cache_key = f"{round(latitude, 3)}_{round(longitude, 3)}_{round(radius_km, 1)}"
+        with _satellite_analysis_lock:
+            cached = _satellite_analysis_cache.get(cache_key)
+            if cached and (time.time() - cached["timestamp"]) < 3600:
+                return cached["data"]
+        return None
+
+    @classmethod
     def analyze_location_change(
+        cls,
         latitude: float,
         longitude: float,
         radius_km: float = 5.0
@@ -23,7 +39,26 @@ class AutomaticSatellitePairService:
         """
         Queries STAC for the past 60 days, selects the best ascending/descending
         scene pair, triggers raw S3 clipping, and calculates temporal backscatter change.
+        Thread-safe and cached for 1 hour to prevent redundant heavy S3 downloads.
         """
+        cache_key = f"{round(latitude, 3)}_{round(longitude, 3)}_{round(radius_km, 1)}"
+        with _satellite_analysis_lock:
+            cached = _satellite_analysis_cache.get(cache_key)
+            if cached and (time.time() - cached["timestamp"]) < 3600:
+                return cached["data"]
+
+        result = cls._execute_analysis(latitude, longitude, radius_km)
+        with _satellite_analysis_lock:
+            _satellite_analysis_cache[cache_key] = {"timestamp": time.time(), "data": result}
+        return result
+
+    @classmethod
+    def _execute_analysis(
+        cls,
+        latitude: float,
+        longitude: float,
+        radius_km: float = 5.0
+    ) -> Dict[str, Any]:
         # 1. Query Copernicus STAC API for Sentinel-1 scenes in the past 60 days
         end_date = datetime.utcnow().strftime("%Y-%m-%d")
         start_date = (datetime.utcnow() - pd_days(60)).strftime("%Y-%m-%d")
