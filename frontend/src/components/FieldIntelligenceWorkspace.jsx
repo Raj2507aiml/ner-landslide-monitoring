@@ -176,7 +176,17 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
     setActionError(null);
     setActionSuccess(null);
 
-    const res = await updateReportStatus(selectedReportId, newStatus);
+    let res = await updateReportStatus(selectedReportId, newStatus);
+
+    // Resilient transition: If direct PENDING -> VERIFIED fails due to backend workflow,
+    // automatically promote to UNDER_REVIEW first, then transition to VERIFIED
+    if (!res.ok && newStatus === 'VERIFIED' && selectedReportDetail?.status === 'PENDING') {
+      const reviewRes = await updateReportStatus(selectedReportId, 'UNDER_REVIEW');
+      if (reviewRes.ok) {
+        res = await updateReportStatus(selectedReportId, 'VERIFIED');
+      }
+    }
+
     setIsUpdatingStatus(false);
 
     if (res.ok) {

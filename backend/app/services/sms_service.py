@@ -29,11 +29,15 @@ class SmsNotificationService:
         if Client is None:
             logger.warning("[SMS] twilio Python package is not installed.")
             return None
-        if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
+
+        sid = settings.TWILIO_ACCOUNT_SID
+        token = settings.TWILIO_AUTH_TOKEN
+
+        if not sid or not token:
             logger.warning("[SMS] Twilio credentials not configured in settings.")
             return None
         try:
-            return Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+            return Client(sid, token)
         except Exception as e:
             logger.error(f"[SMS] Failed to initialize Twilio client: {e}")
             return None
@@ -41,7 +45,7 @@ class SmsNotificationService:
     @classmethod
     def get_default_recipients(cls) -> List[str]:
         """Parses default emergency recipient numbers from settings."""
-        raw = settings.EMERGENCY_RECIPIENT_NUMBERS or ""
+        raw = settings.EMERGENCY_RECIPIENT_NUMBERS or "+917786898038"
         return [num.strip() for num in raw.split(",") if num.strip()]
 
     @classmethod
@@ -58,7 +62,7 @@ class SmsNotificationService:
                 "error": "Twilio gateway unconfigured (TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN missing)"
             }
 
-        sender_number = settings.TWILIO_PHONE_NUMBER
+        sender_number = settings.TWILIO_PHONE_NUMBER or "+17372212163"
         # Sanitize and format number (strip spaces, hyphens, ensure +91 or +)
         clean_num = "".join(c for c in to_phone if c.isdigit() or c == '+').strip()
         if not clean_num.startswith("+"):
