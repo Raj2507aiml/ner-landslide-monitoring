@@ -3,7 +3,7 @@
  * Contains 38 verified emergency facilities across all 8 North Eastern Region states.
  */
 
-import { calculateGeodesicDistanceKm } from './infrastructureService';
+import { calculateGeodesicDistanceKm } from './infrastructureService.js';
 
 export function calculateCompassHeading(lat1, lon1, lat2, lon2) {
   const dLon = ((lon2 - lon1) * Math.PI) / 180;

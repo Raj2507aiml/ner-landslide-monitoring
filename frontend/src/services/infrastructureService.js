@@ -1,4 +1,4 @@
-import { apiFetch } from './apiConfig';
+import { apiFetch } from './apiConfig.js';
 
 export async function getNearbyRoads(latitude, longitude, radiusKm = 5.0) {
   try {

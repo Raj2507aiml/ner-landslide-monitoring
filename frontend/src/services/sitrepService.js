@@ -4,8 +4,9 @@
  * manages A4 printable document generation, offline HTML export, and print triggers.
  */
 
-import { getDispatchHistory } from './alertDispatchService';
-import { computeNearestFacilities } from './emergencyFacilitiesData';
+import { getDispatchHistory } from './alertDispatchService.js';
+import { computeNearestFacilities } from './emergencyFacilitiesData.js';
+import { calculateGeodesicDistanceKm } from './infrastructureService.js';
 
 /**
  * Generates an official unique SITREP reference identifier.
@@ -107,16 +108,114 @@ export function compileSitrepPayload(context = {}) {
     ? Number(satelliteChangeData.pixel_change_percentage).toFixed(1)
     : '19.2';
 
-  // Road disruptions
+  // Road disruptions & arterial lifelines
   let roads = [];
   if (roadData?.roads && Array.isArray(roadData.roads) && roadData.roads.length > 0) {
-    roads = roadData.roads.map(r => ({
-      name: r.name || r.ref || 'Unnamed Highway Link',
-      ref: r.ref || 'NH',
-      status: r.connectivity_status || 'AT_RISK',
-      distanceKm: r.distance_km != null ? Number(r.distance_km).toFixed(1) : '1.2',
-      notes: r.impact_notes || r.status_description || 'Active slope instability adjacent to carriageway',
-      bypass: r.bypass_route || 'Alternate state corridor via bypass artery'
+    const statusWeight = {
+      BLOCKED: 5,
+      SEVERELY_IMPACTED: 4,
+      AT_RISK: 3,
+      MONITOR: 2,
+      NORMAL: 1
+    };
+
+    const corridorMap = new Map();
+
+    roadData.roads.forEach(r => {
+      // Calculate true geodesic distance from sector centroid to nearest point of road segment
+      let minD = Infinity;
+      if (r.geometry?.coordinates && Array.isArray(r.geometry.coordinates)) {
+        for (const pt of r.geometry.coordinates) {
+          if (Array.isArray(pt) && pt.length >= 2) {
+            // GeoJSON coordinates format: [longitude, latitude]
+            const ptLon = pt[0];
+            const ptLat = pt[1];
+            const d = calculateGeodesicDistanceKm(lat, lng, ptLat, ptLon);
+            if (d < minD) minD = d;
+          }
+        }
+      } else if (r.distance_km != null && !isNaN(Number(r.distance_km))) {
+        minD = Number(r.distance_km);
+      }
+
+      if (minD === Infinity) {
+        minD = 1.2;
+      }
+
+      const rawName = (r.name || '').trim();
+      const rawRef = (r.ref || '').trim();
+      const hwType = (r.highway_type || '').toLowerCase();
+
+      // Meaningful identifier for grouping multiple OSM way segments of the same highway
+      const groupKey = rawRef || rawName || (hwType ? `arterial_${hwType}` : `road_${r.osm_id || 'link'}`);
+
+      // Pretty display name and ref
+      let displayName = rawName || rawRef;
+      if (!displayName) {
+        const cleanType = hwType ? hwType.replace(/_/g, ' ') : 'local';
+        displayName = `Corridor Link (${cleanType.charAt(0).toUpperCase() + cleanType.slice(1)})`;
+      }
+      let displayRef = rawRef || (displayName.match(/^(NH|SH|MDR)\s*[-]?\s*\d+/i) ? displayName : 'State / District Route');
+
+      const currWeight = statusWeight[r.connectivity_status] || 1;
+      const explanation = r.explanation || r.impact_notes || r.status_description ||
+        (currWeight >= 4 ? 'Critical blockage: Impassable due to slope failure and debris' :
+         currWeight === 3 ? 'Elevated landslide hazard adjacent to carriageway' :
+         currWeight === 2 ? 'Observational monitoring required: Precautionary surveillance' :
+         'Normal connectivity: Clear corridor under routine monitoring');
+
+      const existing = corridorMap.get(groupKey);
+      if (!existing) {
+        corridorMap.set(groupKey, {
+          name: displayName,
+          ref: displayRef,
+          status: r.connectivity_status || 'NORMAL',
+          statusWeight: currWeight,
+          minDistanceKm: minD,
+          notes: explanation,
+          bypass: r.bypass_route || (currWeight >= 3 ? 'Designated alternate bypass route via ridge link' : 'Standard highway alignment'),
+          highwayType: hwType,
+          isNamed: Boolean(rawName || rawRef),
+          count: 1
+        });
+      } else {
+        existing.count += 1;
+        if (minD < existing.minDistanceKm) {
+          existing.minDistanceKm = minD;
+        }
+        // If this segment has a worse status, upgrade status and its notes
+        if (currWeight > existing.statusWeight) {
+          existing.status = r.connectivity_status;
+          existing.statusWeight = currWeight;
+          existing.notes = explanation;
+          if (r.bypass_route) existing.bypass = r.bypass_route;
+        }
+      }
+    });
+
+    // Sort corridors:
+    // 1. Disrupted corridors first (BLOCKED > SEVERELY_IMPACTED > AT_RISK > MONITOR)
+    // 2. Named highways / major arterials
+    // 3. Proximity to centroid ascending
+    const sortedCorridors = Array.from(corridorMap.values()).sort((a, b) => {
+      if (b.statusWeight !== a.statusWeight) {
+        return b.statusWeight - a.statusWeight;
+      }
+      if (b.isNamed !== a.isNamed) {
+        return b.isNamed ? 1 : -1;
+      }
+      return a.minDistanceKm - b.minDistanceKm;
+    });
+
+    // Select top 12 representative lifelines to keep SITREP executive, readable, and comprehensive
+    roads = sortedCorridors.slice(0, 12).map(r => ({
+      name: r.name,
+      ref: r.ref,
+      status: r.status,
+      distanceKm: r.minDistanceKm.toFixed(1),
+      notes: r.notes,
+      bypass: r.bypass,
+      segmentCount: r.count
     }));
   } else {
     roads = [
