@@ -41,11 +41,11 @@ class Settings(BaseSettings):
     CDSE_S3_SECRET_KEY: str = ""
 
     # Twilio SMS Early Warning Notification Gateway
-    TWILIO_ACCOUNT_SID: str = ""
-    TWILIO_AUTH_TOKEN: str = ""
-    TWILIO_PHONE_NUMBER: str = ""
-    EMERGENCY_RECIPIENT_NUMBERS: str = "+917786898038"
-    SMS_ALERT_TEMPLATE: str = "[NDMA ALERT] {severity} {report_type} verified in {state_name} ({latitude:.3f}N, {longitude:.3f}E). Hazard: {description}. Helpline: 1070/112"
+    TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
+    TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
+    TWILIO_PHONE_NUMBER: str = os.getenv("TWILIO_PHONE_NUMBER", "+17372212163")
+    EMERGENCY_RECIPIENT_NUMBERS: str = os.getenv("EMERGENCY_RECIPIENT_NUMBERS", "+917786898038")
+    SMS_ALERT_TEMPLATE: str = "[NDMA ALERT] {severity} {report_type} in {state_name} ({latitude:.3f}N, {longitude:.3f}E): {description}. Helpline: 1070/112"
 
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,

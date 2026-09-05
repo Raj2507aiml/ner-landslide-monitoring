@@ -10,7 +10,10 @@ import os
 import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from twilio.rest import Client
+try:
+    from twilio.rest import Client
+except ImportError:
+    Client = None
 
 from app.core.config import settings
 
@@ -21,8 +24,11 @@ RECENT_DISPATCH_LOGS: List[Dict[str, Any]] = []
 
 class SmsNotificationService:
     @classmethod
-    def get_client(cls) -> Optional[Client]:
+    def get_client(cls) -> Optional[Any]:
         """Initializes and returns a Twilio Client if credentials exist."""
+        if Client is None:
+            logger.warning("[SMS] twilio Python package is not installed.")
+            return None
         if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
             logger.warning("[SMS] Twilio credentials not configured in settings.")
             return None
