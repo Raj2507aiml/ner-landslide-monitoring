@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   FileText,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import {
   RECIPIENT_AGENCIES,
@@ -24,6 +25,7 @@ import {
   recordDispatch,
   getDispatchHistory
 } from '../services/alertDispatchService';
+import { sendTwilioSmsAlert } from '../services/notificationService';
 
 export default function AlertDispatchModal({
   isOpen,
@@ -96,6 +98,41 @@ export default function AlertDispatchModal({
 
     if (entry) setHistory(prev => [entry, ...prev]);
     setDispatchSuccess(`Alert transmitted via ${channel.toUpperCase()} and logged to audit trail.`);
+  };
+
+  const [isSendingTwilio, setIsSendingTwilio] = useState(false);
+
+  const handleSendTwilioSms = async () => {
+    setIsSendingTwilio(true);
+    setDispatchSuccess(null);
+    try {
+      const recipientList = customPhone.trim() ? [customPhone.trim()] : ['+917786898038'];
+      const res = await sendTwilioSmsAlert({
+        warningLevel: alertData.warningLevel || 'ALERT',
+        locationName: alertData.locationName || 'Monitored Sector',
+        message: alertText,
+        recipients: recipientList
+      });
+
+      if (res.ok) {
+        const entry = recordDispatch({
+          channel: 'TWILIO_SMS',
+          agency: targetAgency,
+          recipient: recipientList.join(', '),
+          location: alertData.locationName || `${alertData.lat?.toFixed(2)}, ${alertData.lng?.toFixed(2)}`,
+          warningLevel: alertData.warningLevel || 'ALERT',
+          status: 'DELIVERED_VIA_TWILIO'
+        });
+        if (entry) setHistory(prev => [entry, ...prev]);
+        setDispatchSuccess(`Emergency SMS successfully dispatched via Twilio to ${recipientList.join(', ')}!`);
+      } else {
+        setDispatchSuccess(`Twilio notice: ${res.detail || 'Dispatched via Twilio Gateway.'}`);
+      }
+    } catch (err) {
+      setDispatchSuccess(`Failed to dispatch Twilio SMS: ${err.message}`);
+    } finally {
+      setIsSendingTwilio(false);
+    }
   };
 
   const level = alertData.warningLevel || 'ALERT';
@@ -206,6 +243,18 @@ export default function AlertDispatchModal({
               </button>
 
               <button
+                onClick={() => setActiveTab('twilio')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 border-b-2 transition cursor-pointer ${
+                  activeTab === 'twilio'
+                    ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10 rounded-t'
+                    : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                <Radio className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Twilio Gateway</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('telegram')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 border-b-2 transition cursor-pointer ${
                   activeTab === 'telegram'
@@ -266,15 +315,49 @@ export default function AlertDispatchModal({
                 </button>
               )}
 
-              {activeTab === 'sms' && (
+              {activeTab === 'twilio' && (
                 <button
-                  onClick={() => handleDispatchChannel('sms')}
-                  className="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer text-xs shadow-md shadow-sky-950/20"
+                  onClick={handleSendTwilioSms}
+                  disabled={isSendingTwilio}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer text-xs shadow-md shadow-indigo-950/20"
                 >
-                  <Smartphone className="h-3.5 w-3.5" />
-                  <span>Launch SMS Dispatch</span>
-                  <ExternalLink className="h-3 w-3 opacity-70" />
+                  {isSendingTwilio ? (
+                    <>
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Dispatching Twilio SMS...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Radio className="h-3.5 w-3.5 text-indigo-200" />
+                      <span>⚡ Send Automated SMS via Twilio</span>
+                    </>
+                  )}
                 </button>
+              )}
+
+              {activeTab === 'sms' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSendTwilioSms}
+                    disabled={isSendingTwilio}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer text-xs shadow-md shadow-indigo-950/20"
+                  >
+                    {isSendingTwilio ? (
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Radio className="h-3 w-3 text-indigo-200" />
+                    )}
+                    <span>Twilio Gateway</span>
+                  </button>
+                  <button
+                    onClick={() => handleDispatchChannel('sms')}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-bold flex items-center gap-1.5 transition cursor-pointer text-xs shadow-md shadow-sky-950/20"
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                    <span>Device App</span>
+                    <ExternalLink className="h-3 w-3 opacity-70" />
+                  </button>
+                </div>
               )}
 
               {(activeTab === 'telegram' || activeTab === 'ndma') && (

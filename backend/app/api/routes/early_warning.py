@@ -6,7 +6,7 @@ Combines environmental hazard models, satellite radar change, and independent gr
 """
 
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from app.services.aoi_service import is_inside_ner
 from app.services.composite_risk_service import CompositeRiskService
 from app.services.automatic_satellite_pair_service import AutomaticSatellitePairService
 from app.services.early_warning_service import EarlyWarningService
+from app.services.sms_service import SmsNotificationService
 
 router = APIRouter()
 
@@ -46,12 +47,18 @@ class EarlyWarningResponse(BaseModel):
     observational_verification: str = Field(..., description="Satellite availability status description")
     scientific_notice: str = Field(..., description="Scientific disclaimer notice")
     ground_observation_context: Optional[GroundObservationContextDetails] = Field(None, description="Independent ground observation field intelligence layer")
+    sms_dispatch_status: Optional[str] = Field("NOT_TRIGGERED", description="Status of automated Twilio SMS alert dispatch")
 
 @router.post("/analyze", response_model=EarlyWarningResponse)
-def analyze_early_warning(payload: EarlyWarningAnalysisRequest, db: Session = Depends(get_db)):
+def analyze_early_warning(
+    payload: EarlyWarningAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     """
     Computes the composite hazard assessment and queries automatic satellite change data,
     running them through the Early Warning Decision Engine.
+    Automatically dispatches Twilio SMS alerts to emergency contacts when elevated hazard is detected.
     """
     # 1. Coordinate boundary validation
     if not is_inside_ner(payload.latitude, payload.longitude):
@@ -92,7 +99,21 @@ def analyze_early_warning(payload: EarlyWarningAnalysisRequest, db: Session = De
             detail=f"Early warning decision evaluation failed: {str(e)}"
         )
 
-    # 5. Step D: Return unified Early Warning response structure
+    # 5. Automated Twilio SMS Dispatch on elevated early warning state
+    sms_dispatch_status = "NOT_TRIGGERED"
+    warning_level = decision_result.get("warning_level", "NORMAL")
+    if warning_level in ["WATCH", "ALERT", "CRITICAL"]:
+        loc_str = f"{payload.latitude:.4f}N, {payload.longitude:.4f}E (NER Sector)"
+        reasoning = decision_result.get("reasoning", "High landslide hazard detected.")
+        background_tasks.add_task(
+            SmsNotificationService.broadcast_alert,
+            message=reasoning,
+            warning_level=warning_level,
+            location_name=loc_str
+        )
+        sms_dispatch_status = "AUTOMATICALLY_QUEUED"
+
+    # 6. Step D: Return unified Early Warning response structure
     sat_status = "UNAVAILABLE"
     if radar_change_data:
         sat_status = radar_change_data.get("status", "UNAVAILABLE")
@@ -113,5 +134,6 @@ def analyze_early_warning(payload: EarlyWarningAnalysisRequest, db: Session = De
         "reasoning": decision_result["reasoning"],
         "observational_verification": decision_result["satellite_availability"],
         "scientific_notice": decision_result["scientific_notice"],
-        "ground_observation_context": decision_result.get("ground_observation_context")
+        "ground_observation_context": decision_result.get("ground_observation_context"),
+        "sms_dispatch_status": sms_dispatch_status
     }

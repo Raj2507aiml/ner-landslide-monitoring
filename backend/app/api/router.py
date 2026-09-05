@@ -15,7 +15,8 @@ from app.api.routes import (
     operations,
     incidents,
     auth,
-    travel
+    travel,
+    notifications
 )
 
 api_router = APIRouter()
@@ -37,5 +38,7 @@ api_router.include_router(operations.router, prefix="/v1/operations", tags=["ope
 api_router.include_router(incidents.router, prefix="/v1/incidents", tags=["incidents"])
 api_router.include_router(travel.router, prefix="/v1/travel", tags=["travel"])
 api_router.include_router(travel.router, prefix="/travel", tags=["travel"])
+api_router.include_router(notifications.router, prefix="/v1/notifications", tags=["notifications"])
+api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 
 

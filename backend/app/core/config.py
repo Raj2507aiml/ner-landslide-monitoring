@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     CDSE_S3_ACCESS_KEY: str = ""
     CDSE_S3_SECRET_KEY: str = ""
 
+    # Twilio SMS Early Warning Notification Gateway
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+    EMERGENCY_RECIPIENT_NUMBERS: str = "+917786898038"
+
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,
         env_file_encoding="utf-8",
