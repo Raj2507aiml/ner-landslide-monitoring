@@ -73,6 +73,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [actionError, setActionError] = useState(null);
+  const [actionSuccess, setActionSuccess] = useState(null);
 
   // Lightbox preview for photos
   const [activePhotoUrl, setActivePhotoUrl] = useState(null);
@@ -160,6 +161,8 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
     }
 
     loadDetail();
+    setActionError(null);
+    setActionSuccess(null);
     return () => {
       isMounted = false;
     };
@@ -171,11 +174,20 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
 
     setIsUpdatingStatus(true);
     setActionError(null);
+    setActionSuccess(null);
 
     const res = await updateReportStatus(selectedReportId, newStatus);
     setIsUpdatingStatus(false);
 
     if (res.ok) {
+      if (res.data?.notification_dispatched) {
+        setActionSuccess(`Observation verified! Automated SMS alert dispatched to registered users in ${res.data.detected_state || 'the region'} (${res.data.recipients_notified || 1} contact(s)).`);
+      } else if (newStatus === 'VERIFIED') {
+        setActionSuccess('Observation verified.');
+      } else {
+        setActionSuccess(`Report status successfully updated to ${newStatus}.`);
+      }
+
       // Refresh detailed view & queue
       const updatedDetail = await getFieldReportById(selectedReportId);
       if (updatedDetail.ok) {
@@ -638,6 +650,21 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                   </p>
                 </div>
 
+                {/* Action Feedback Alerts */}
+                {actionError && (
+                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
+                    <span>{actionError}</span>
+                  </div>
+                )}
+
+                {actionSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                    <span>{actionSuccess}</span>
+                  </div>
+                )}
+
                 {/* Section 5: Review Action Workflow */}
                 <div className="pt-4 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
                   <div className="text-xs text-[var(--text-muted)]">
@@ -659,9 +686,17 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                           type="button"
                           onClick={() => handleTransitionStatus('UNDER_REVIEW')}
                           disabled={isUpdatingStatus}
-                          className="px-5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md shadow-sky-600/30 transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                          className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-md shadow-sky-600/30 transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                         >
                           <Eye className="h-4 w-4" /> Start Review
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleTransitionStatus('VERIFIED')}
+                          disabled={isUpdatingStatus}
+                          className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/30 transition disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                        >
+                          <CheckCircle2 className="h-4 w-4" /> Quick Verify & SMS Alert
                         </button>
                       </>
                     )}

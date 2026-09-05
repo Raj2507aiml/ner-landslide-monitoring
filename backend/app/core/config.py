@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_PHONE_NUMBER: str = ""
     EMERGENCY_RECIPIENT_NUMBERS: str = "+917786898038"
+    SMS_ALERT_TEMPLATE: str = "[NDMA ALERT] {severity} {report_type} verified in {state_name} ({latitude:.3f}N, {longitude:.3f}E). Hazard: {description}. Helpline: 1070/112"
 
     model_config = SettingsConfigDict(
         env_file=ENV_PATH,

@@ -83,6 +83,9 @@ class FieldReportResponse(BaseModel):
     status: ReportStatus
     created_at: datetime
     updated_at: datetime
+    detected_state: Optional[str] = None
+    notification_dispatched: Optional[bool] = None
+    recipients_notified: Optional[int] = None
 
     class Config:
         from_attributes = True

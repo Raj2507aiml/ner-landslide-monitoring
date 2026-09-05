@@ -36,7 +36,7 @@ from app.services.field_report_media_service import (
 
 # Valid operational status transitions
 VALID_TRANSITIONS: Dict[str, List[str]] = {
-    ReportStatus.PENDING.value: [ReportStatus.UNDER_REVIEW.value, ReportStatus.REJECTED.value],
+    ReportStatus.PENDING.value: [ReportStatus.UNDER_REVIEW.value, ReportStatus.VERIFIED.value, ReportStatus.REJECTED.value],
     ReportStatus.UNDER_REVIEW.value: [ReportStatus.VERIFIED.value, ReportStatus.REJECTED.value, ReportStatus.PENDING.value],
     ReportStatus.VERIFIED.value: [ReportStatus.UNDER_REVIEW.value],
     ReportStatus.REJECTED.value: [ReportStatus.UNDER_REVIEW.value],

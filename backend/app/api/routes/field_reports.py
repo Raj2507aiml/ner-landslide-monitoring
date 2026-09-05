@@ -6,11 +6,12 @@ GeoJSON map layers, risk signals, review queue triage, status updates, and media
 """
 
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status as http_status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks, status as http_status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
-from app.services.aoi_service import is_inside_ner
+from app.services.aoi_service import is_inside_ner, get_ner_state_name
+from app.services.sms_service import SmsNotificationService
 from app.services.field_report_service import FieldReportService
 from app.services.field_report_media_service import FieldReportMediaService
 from app.services.field_report_spatial_service import FieldReportSpatialService
@@ -227,12 +228,29 @@ def get_field_report(report_id: int, db: Session = Depends(get_db)):
 def update_field_report_status(
     report_id: int,
     status_in: FieldReportStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
     """
     Updates the operational verification status of a field report.
     Enforces controlled workflow transitions (e.g. PENDING -> UNDER_REVIEW -> VERIFIED/REJECTED).
+    When verified by an authority/admin, automatically triggers a regional SMS alert
+    to registered citizens in the affected NER state.
     """
+    # Fetch existing report to know previous status
+    old_report = FieldReportService.get_report_by_id(db=db, report_id=report_id)
+    if not old_report:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Field report with ID {report_id} not found."
+        )
+
+    was_already_verified = (
+        old_report.status.value == ReportStatus.VERIFIED.value
+        if hasattr(old_report.status, "value")
+        else str(old_report.status) == ReportStatus.VERIFIED.value
+    )
+
     try:
         updated_report = FieldReportService.update_status(
             db=db,
@@ -250,7 +268,31 @@ def update_field_report_status(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail=f"Field report with ID {report_id} not found."
         )
-    return updated_report
+
+    # Automated SMS Trigger on VERIFIED transition
+    detected_state = get_ner_state_name(updated_report.latitude, updated_report.longitude) or "North Eastern Region"
+    notification_dispatched = False
+    recipients_count = 0
+
+    if status_in.status == ReportStatus.VERIFIED and not was_already_verified:
+        recipients = SmsNotificationService.get_recipients_for_region(db, detected_state)
+        if recipients:
+            sms_body = SmsNotificationService.format_report_alert_sms(updated_report, detected_state)
+            background_tasks.add_task(
+                SmsNotificationService.broadcast_regional_alert,
+                message=sms_body,
+                recipients=recipients,
+                state_name=detected_state,
+                severity=str(updated_report.severity)
+            )
+            notification_dispatched = True
+            recipients_count = len(recipients)
+
+    resp = FieldReportResponse.model_validate(updated_report)
+    resp.detected_state = detected_state
+    resp.notification_dispatched = notification_dispatched
+    resp.recipients_notified = recipients_count
+    return resp
 
 # =========================================================================
 # 4. Media Evidence Endpoints

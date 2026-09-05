@@ -53,14 +53,16 @@ class SmsNotificationService:
             }
 
         sender_number = settings.TWILIO_PHONE_NUMBER
-        target_phone = to_phone.strip()
-
-        # Format number with +91 if 10-digit Indian mobile
-        if not target_phone.startswith("+"):
-            if len(target_phone) == 10:
-                target_phone = f"+91{target_phone}"
+        # Sanitize and format number (strip spaces, hyphens, ensure +91 or +)
+        clean_num = "".join(c for c in to_phone if c.isdigit() or c == '+').strip()
+        if not clean_num.startswith("+"):
+            if len(clean_num) == 10:
+                clean_num = f"+91{clean_num}"
+            elif len(clean_num) == 12 and clean_num.startswith("91"):
+                clean_num = f"+{clean_num}"
             else:
-                target_phone = f"+{target_phone}"
+                clean_num = f"+{clean_num}"
+        target_phone = clean_num
 
         timestamp_str = datetime.utcnow().isoformat()
 
@@ -129,6 +131,121 @@ class SmsNotificationService:
             }
             cls._log_dispatch(record)
             return record
+
+    @classmethod
+    def format_report_alert_sms(
+        cls,
+        report: Any,
+        state_name: str,
+        custom_template: Optional[str] = None
+    ) -> str:
+        """
+        Formats an SMS notification for an approved/verified hazard report.
+        Allows customization via settings.SMS_ALERT_TEMPLATE or custom_template.
+        Placeholders supported:
+          {state_name}, {report_type}, {severity}, {latitude}, {longitude}, {description}, {id}
+        """
+        template = custom_template or settings.SMS_ALERT_TEMPLATE or (
+            "[NDMA ALERT] {severity} {report_type} in {state_name} ({latitude:.3f}N, {longitude:.3f}E): {description}. Helpline: 1070/112"
+        )
+        
+        # Clean and truncate description to fit standard GSM SMS packet
+        raw_desc = getattr(report, "description", "") or ""
+        short_desc = raw_desc.replace("\n", " ").strip()
+        if len(short_desc) > 60:
+            short_desc = short_desc[:57] + "..."
+
+        rep_type = getattr(report, "report_type", "HAZARD")
+        if hasattr(rep_type, "value"):
+            rep_type = rep_type.value
+        rep_type_formatted = str(rep_type).replace("_", " ").title()
+
+        sev = getattr(report, "severity", "ALERT")
+        if hasattr(sev, "value"):
+            sev = sev.value
+        sev_formatted = str(sev).upper()
+
+        lat = float(getattr(report, "latitude", 0.0))
+        lng = float(getattr(report, "longitude", 0.0))
+        rep_id = getattr(report, "id", 0)
+
+        try:
+            return template.format(
+                state_name=state_name,
+                state=state_name,
+                report_type=rep_type_formatted,
+                type=rep_type_formatted,
+                severity=sev_formatted,
+                latitude=lat,
+                lat=lat,
+                longitude=lng,
+                lng=lng,
+                description=short_desc,
+                desc=short_desc,
+                id=rep_id,
+                report_id=rep_id
+            )
+        except Exception as e:
+            logger.warning(f"[SMS] Template formatting failed ({e}), using safe fallback.")
+            return f"[NDMA ALERT] {sev_formatted} {rep_type_formatted} in {state_name} ({lat:.3f}N, {lng:.3f}E): {short_desc}. Helpline: 1070/112"
+
+    @classmethod
+    def get_recipients_for_region(cls, db: Any, state_name: Optional[str]) -> List[str]:
+        """
+        Queries all registered users belonging to the given NER state/region.
+        Includes configured emergency recipient numbers as guaranteed fallback/safeguard.
+        """
+        phones: List[str] = []
+
+        if db and state_name:
+            try:
+                from app.models.user import User
+                clean_state = state_name.strip()
+                # Query users matching state name or broad NER keywords
+                users = db.query(User).filter(
+                    User.phone.isnot(None),
+                    User.phone != "",
+                    (
+                        User.state.ilike(f"%{clean_state}%") |
+                        User.state.ilike("%North East%") |
+                        User.state.ilike("%NER%")
+                    )
+                ).all()
+                for u in users:
+                    if u.phone and u.phone.strip():
+                        phones.append(u.phone.strip())
+            except Exception as e:
+                logger.error(f"[SMS] Failed to query regional users for state {state_name}: {e}")
+
+        # Always incorporate default emergency numbers (e.g. from settings / .env)
+        default_recipients = cls.get_default_recipients()
+
+        # Deduplicate while preserving clean order
+        unique_phones: List[str] = []
+        for p in phones + default_recipients:
+            p_clean = "".join(c for c in p if c.isdigit() or c == '+')
+            if p_clean and p_clean not in unique_phones:
+                unique_phones.append(p_clean)
+
+        return unique_phones
+
+    @classmethod
+    def broadcast_regional_alert(
+        cls,
+        message: str,
+        recipients: List[str],
+        state_name: str = "NER",
+        severity: str = "ALERT"
+    ) -> List[Dict[str, Any]]:
+        """
+        Broadcasts a regional emergency alert to all target recipients in the affected state.
+        """
+        logger.info(f"[SMS] Broadcasting regional alert in {state_name} ({severity}) to {len(recipients)} recipients...")
+        results = []
+        for phone in recipients:
+            res = cls.send_sms(to_phone=phone, message=message)
+            results.append(res)
+        return results
 
     @classmethod
     def broadcast_alert(

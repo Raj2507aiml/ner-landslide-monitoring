@@ -37,32 +37,53 @@ def _point_in_polygon(x: float, y: float, polygon: list) -> bool:
             return False
     return True
 
-def is_inside_ner(latitude: float, longitude: float) -> bool:
-    """
-    Checks if a given coordinate lies within the boundary of 
-    the 8 states in the North Eastern Region of India.
-    """
-    if not os.path.exists(GEOJSON_PATH):
-        # Fallback to general bounding box if data is missing (should not happen)
-        # Bounding box of NER roughly: lat [21.9, 29.5], lng [88.0, 97.4]
-        return 21.9 <= latitude <= 29.5 and 88.0 <= longitude <= 97.4
+# In-memory cached GeoJSON boundary data
+_NER_GEOJSON: Optional[Dict[str, Any]] = None
 
-    with open(GEOJSON_PATH, "r") as f:
-        geojson = json.load(f)
+def _get_ner_geojson() -> Optional[Dict[str, Any]]:
+    global _NER_GEOJSON
+    if _NER_GEOJSON is None:
+        if os.path.exists(GEOJSON_PATH):
+            try:
+                with open(GEOJSON_PATH, "r", encoding="utf-8") as f:
+                    _NER_GEOJSON = json.load(f)
+            except Exception:
+                _NER_GEOJSON = None
+    return _NER_GEOJSON
+
+def get_ner_state_name(latitude: float, longitude: float) -> Optional[str]:
+    """
+    Identifies which of the 8 North Eastern Region states contains the given coordinates.
+    Returns the state name (e.g. 'Assam', 'Nagaland', 'Meghalaya', etc.) or None if outside NER.
+    """
+    geojson = _get_ner_geojson()
+    if not geojson:
+        # Fallback NER bounding box check
+        if 21.9 <= latitude <= 29.5 and 88.0 <= longitude <= 97.4:
+            return "North Eastern Region"
+        return None
 
     for feature in geojson.get("features", []):
         geometry = feature.get("geometry", {})
         geom_type = geometry.get("type")
         coords = geometry.get("coordinates", [])
+        state_name = feature.get("properties", {}).get("state_name")
 
         if geom_type == "Polygon":
             if _point_in_polygon(longitude, latitude, coords):
-                return True
+                return state_name
         elif geom_type == "MultiPolygon":
             for poly in coords:
                 if _point_in_polygon(longitude, latitude, poly):
-                    return True
-    return False
+                    return state_name
+    return None
+
+def is_inside_ner(latitude: float, longitude: float) -> bool:
+    """
+    Checks if a given coordinate lies within the boundary of 
+    the 8 states in the North Eastern Region of India.
+    """
+    return get_ner_state_name(latitude, longitude) is not None
 
 def calculate_aoi(latitude: float, longitude: float, radius_km: float = 5.0) -> Dict[str, Any]:
     """
