@@ -5,11 +5,18 @@ Provides business logic, controlled verification workflows, and priority-ordered
 review queues for managing citizen and field official hazard intelligence reports.
 """
 
+import os
+import io
+import uuid
+import hashlib
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
+from PIL import Image
+from fastapi import UploadFile, HTTPException, status
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
+from app.core.config import BASE_DIR
 from app.models.field_report import FieldReport
 from app.models.field_report_media import FieldReportMedia
 from app.schemas.field_report import (
@@ -34,6 +41,22 @@ from app.services.field_report_media_service import (
     compute_exif_consistency
 )
 
+# Secure Documents Storage Configuration
+SECURE_DOCS_ROOT = os.path.join(BASE_DIR, "data", "secure_documents")
+MAX_DOC_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit
+ALLOWED_DOC_FORMATS = {
+    "JPEG": ("image/jpeg", ".jpg"),
+    "PNG": ("image/png", ".png"),
+    "WEBP": ("image/webp", ".webp")
+}
+
+def _ensure_secure_docs_dir():
+    os.makedirs(SECURE_DOCS_ROOT, exist_ok=True)
+    gitignore_path = os.path.join(SECURE_DOCS_ROOT, ".gitignore")
+    if not os.path.exists(gitignore_path):
+        with open(gitignore_path, "w") as f:
+            f.write("*\n!.gitignore\n")
+
 # Valid operational status transitions
 VALID_TRANSITIONS: Dict[str, List[str]] = {
     ReportStatus.PENDING.value: [ReportStatus.UNDER_REVIEW.value, ReportStatus.VERIFIED.value, ReportStatus.REJECTED.value],
@@ -47,7 +70,17 @@ class FieldReportService:
     def create_report(db: Session, report_in: FieldReportCreate) -> FieldReport:
         """
         Persists a new field observation report into the database with initial PENDING status.
+        Securely handles full_name and validates/masks 12-digit Aadhaar number if provided.
         """
+        masked_aadhaar = None
+        aadhaar_hash = None
+        if report_in.aadhaar_number:
+            raw_aadhaar = "".join(c for c in report_in.aadhaar_number if c.isdigit())
+            if len(raw_aadhaar) != 12:
+                raise ValueError("Aadhaar Number must contain exactly 12 numeric digits.")
+            masked_aadhaar = f"XXXX-XXXX-{raw_aadhaar[-4:]}"
+            aadhaar_hash = hashlib.sha256(raw_aadhaar.encode("utf-8")).hexdigest()
+
         db_report = FieldReport(
             report_type=report_in.report_type.value,
             description=report_in.description,
@@ -56,6 +89,10 @@ class FieldReportService:
             reporter_type=report_in.reporter_type.value,
             severity=report_in.severity.value,
             status=ReportStatus.PENDING.value,
+            full_name=report_in.full_name.strip() if report_in.full_name else None,
+            aadhaar_number=masked_aadhaar,
+            aadhaar_hash=aadhaar_hash,
+            verification_status="PENDING",
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
@@ -149,6 +186,16 @@ class FieldReportService:
             status=report.status,
             created_at=report.created_at,
             updated_at=report.updated_at,
+            full_name=report.full_name,
+            aadhaar_number=report.aadhaar_number,
+            verification_status=report.verification_status or "PENDING",
+            verification_note=report.verification_note,
+            verified_by=report.verified_by,
+            verified_at=report.verified_at,
+            has_aadhaar_card=bool(report.aadhaar_card_path and os.path.exists(report.aadhaar_card_path)),
+            has_aadhaar_qr=bool(report.aadhaar_qr_path and os.path.exists(report.aadhaar_qr_path)),
+            has_jio_tag_image=bool(report.jio_tag_image_path),
+            jio_tag_image_url=report.jio_tag_image_path,
             media=media_responses,
             spatial_context=SpatialContextDetails(
                 nearby_reports_count=nearby_count,
@@ -280,7 +327,14 @@ class FieldReportService:
                 related_report_ids=related_ids,
                 observation_status=obs_status,
                 evidence_confidence=conf,
-                exif_consistency_summary=exif_summary
+                exif_consistency_summary=exif_summary,
+                full_name=r.full_name,
+                aadhaar_number=r.aadhaar_number,
+                verification_status=r.verification_status or "PENDING",
+                verification_note=r.verification_note,
+                has_aadhaar_card=bool(r.aadhaar_card_path),
+                has_aadhaar_qr=bool(r.aadhaar_qr_path),
+                has_jio_tag_image=bool(r.jio_tag_image_path)
             ))
 
         return ReviewQueueResponse(
@@ -292,3 +346,175 @@ class FieldReportService:
             critical_count=critical_count,
             items=items
         )
+
+    @classmethod
+    async def save_verification_documents(
+        cls,
+        db: Session,
+        report_id: int,
+        jio_tag_file: Optional[UploadFile] = None,
+        aadhaar_card_file: Optional[UploadFile] = None,
+        aadhaar_qr_file: Optional[UploadFile] = None
+    ) -> FieldReport:
+        """
+        Processes and stores Jio Tag evidence and private Aadhaar documents.
+        Aadhaar documents are strictly stored in private data/secure_documents/
+        and are never exposed as public static files.
+        """
+        report = db.query(FieldReport).filter(FieldReport.id == report_id).first()
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Field report with ID {report_id} not found."
+            )
+
+        _ensure_secure_docs_dir()
+        secure_report_dir = os.path.join(SECURE_DOCS_ROOT, f"report_{report_id}")
+        os.makedirs(secure_report_dir, exist_ok=True)
+
+        async def _validate_and_read(file: UploadFile, label: str) -> Tuple[bytes, str]:
+            file_bytes = await file.read(MAX_DOC_SIZE_BYTES + 1)
+            if len(file_bytes) > MAX_DOC_SIZE_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"{label} file size exceeds 10 MB limit."
+                )
+            if len(file_bytes) == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{label} uploaded file is empty."
+                )
+            try:
+                test_img = Image.open(io.BytesIO(file_bytes))
+                test_img.verify()
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{label} is an invalid or corrupted image."
+                )
+            try:
+                img = Image.open(io.BytesIO(file_bytes))
+                fmt = (img.format or "").upper()
+                if fmt not in ALLOWED_DOC_FORMATS:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail=f"{label} format '{fmt}' is not supported. Use JPEG, PNG, or WebP."
+                    )
+                mime, ext = ALLOWED_DOC_FORMATS[fmt]
+                return file_bytes, ext
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Failed to read {label}: {str(e)}")
+
+        # 1. Process Jio Tag photo if provided
+        if jio_tag_file and jio_tag_file.filename:
+            media_resp = await FieldReportMediaService.process_and_save_media(
+                db=db,
+                report_id=report_id,
+                file=jio_tag_file
+            )
+            report.jio_tag_image_path = media_resp.media_url
+
+        # 2. Process Aadhaar Card if provided
+        if aadhaar_card_file and aadhaar_card_file.filename:
+            card_bytes, card_ext = await _validate_and_read(aadhaar_card_file, "Aadhaar Card")
+            card_filename = f"card_{uuid.uuid4().hex}{card_ext}"
+            card_path = os.path.join(secure_report_dir, card_filename)
+            with open(card_path, "wb") as f:
+                f.write(card_bytes)
+            report.aadhaar_card_path = card_path
+
+        # 3. Process Aadhaar QR code if provided
+        if aadhaar_qr_file and aadhaar_qr_file.filename:
+            qr_bytes, qr_ext = await _validate_and_read(aadhaar_qr_file, "Aadhaar QR")
+            qr_filename = f"qr_{uuid.uuid4().hex}{qr_ext}"
+            qr_path = os.path.join(secure_report_dir, qr_filename)
+            with open(qr_path, "wb") as f:
+                f.write(qr_bytes)
+            report.aadhaar_qr_path = qr_path
+
+        report.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(report)
+        return report
+
+    @classmethod
+    def get_secure_document_path(cls, db: Session, report_id: int, doc_type: str) -> Optional[str]:
+        """
+        Retrieves the absolute filesystem path for private Aadhaar documents.
+        Enforces that only 'card' and 'qr' types are permitted.
+        """
+        report = db.query(FieldReport).filter(FieldReport.id == report_id).first()
+        if not report:
+            return None
+
+        clean_type = (doc_type or "").strip().lower()
+        if clean_type == "card":
+            path = report.aadhaar_card_path
+        elif clean_type == "qr":
+            path = report.aadhaar_qr_path
+        else:
+            return None
+
+        if path and os.path.exists(path):
+            return path
+        return None
+
+    @classmethod
+    def update_admin_verification(
+        cls,
+        db: Session,
+        report_id: int,
+        verification_status: str,
+        verification_note: Optional[str] = None,
+        verified_by: Optional[str] = None
+    ) -> Tuple[FieldReport, bool]:
+        """
+        Updates manual admin verification status for Aadhaar and Jio Tag evidence.
+        Accepts VERIFIED, REJECTED, or RE_UPLOAD_REQUIRED.
+        Synchronizes with report operational status and determines if regional alert is warranted.
+        """
+        report = db.query(FieldReport).filter(FieldReport.id == report_id).first()
+        if not report:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Field report with ID {report_id} not found."
+            )
+
+        valid_statuses = {"VERIFIED", "REJECTED", "RE_UPLOAD_REQUIRED"}
+        clean_status = (verification_status or "").strip().upper()
+        if clean_status not in valid_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid verification status '{verification_status}'. Must be one of: {', '.join(valid_statuses)}."
+            )
+
+        was_already_verified = (
+            report.status == ReportStatus.VERIFIED.value
+            if isinstance(report.status, str)
+            else getattr(report.status, "value", str(report.status)) == ReportStatus.VERIFIED.value
+        )
+
+        report.verification_status = clean_status
+        if verification_note is not None:
+            report.verification_note = verification_note.strip()
+        if verified_by:
+            report.verified_by = verified_by
+        report.verified_at = datetime.utcnow()
+        report.updated_at = datetime.utcnow()
+
+        became_verified = False
+        if clean_status == "VERIFIED":
+            report.status = ReportStatus.VERIFIED.value
+            if not was_already_verified:
+                became_verified = True
+        elif clean_status == "REJECTED":
+            report.status = ReportStatus.REJECTED.value
+        elif clean_status == "RE_UPLOAD_REQUIRED":
+            if report.status == ReportStatus.PENDING.value:
+                report.status = ReportStatus.UNDER_REVIEW.value
+
+        db.commit()
+        db.refresh(report)
+        return report, became_verified

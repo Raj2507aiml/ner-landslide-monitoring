@@ -5,11 +5,15 @@ Exposes endpoints for submitting, listing, spatial filtering, intelligence summa
 GeoJSON map layers, risk signals, review queue triage, status updates, and media evidence attachment.
 """
 
+import os
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks, status as http_status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
+from app.models.user import User
+from app.api.routes.auth import get_current_admin_user_flexible
 from app.services.aoi_service import is_inside_ner, get_ner_state_name
 from app.services.sms_service import SmsNotificationService
 from app.services.field_report_service import FieldReportService
@@ -21,6 +25,7 @@ from app.schemas.field_report import (
     FieldReportResponse,
     FieldReportDetailResponse,
     FieldReportStatusUpdate,
+    AadhaarVerificationUpdate,
     NearbyFieldReportResponse,
     FieldIntelligenceSummaryRequest,
     FieldIntelligenceSummaryResponse,
@@ -338,3 +343,114 @@ def delete_field_report_media(
         report_id=report_id,
         media_id=media_id
     )
+
+# =========================================================================
+# 5. Jio Tag Evidence & Aadhaar Identity Verification Endpoints
+# =========================================================================
+
+@router.post("/{report_id}/verification-documents", response_model=FieldReportDetailResponse)
+async def upload_verification_documents(
+    report_id: int,
+    jio_tag_image: Optional[UploadFile] = File(None, description="Jio Tag photographic evidence"),
+    aadhaar_card: Optional[UploadFile] = File(None, description="Citizen Aadhaar card document"),
+    aadhaar_qr: Optional[UploadFile] = File(None, description="Citizen Aadhaar QR code document"),
+    db: Session = Depends(get_db)
+):
+    """
+    Attaches Jio Tag photographic evidence and confidential Aadhaar identity verification documents
+    to a field report. Aadhaar documents are stored in secure private storage.
+    """
+    await FieldReportService.save_verification_documents(
+        db=db,
+        report_id=report_id,
+        jio_tag_file=jio_tag_image,
+        aadhaar_card_file=aadhaar_card,
+        aadhaar_qr_file=aadhaar_qr
+    )
+    detail = FieldReportService.get_report_detail(db=db, report_id=report_id)
+    if not detail:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Field report with ID {report_id} not found."
+        )
+    return detail
+
+
+@router.get("/{report_id}/aadhaar-document/{doc_type}")
+def get_aadhaar_document(
+    report_id: int,
+    doc_type: str,
+    admin_user: User = Depends(get_current_admin_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """
+    Secure endpoint allowing ONLY verified Disaster Authority Admins to view
+    confidential Aadhaar card or QR images. Unauthenticated or citizen requests are rejected.
+    """
+    clean_type = (doc_type or "").strip().lower()
+    if clean_type not in ("card", "qr"):
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Invalid document type. Allowed values: 'card', 'qr'."
+        )
+
+    file_path = FieldReportService.get_secure_document_path(db=db, report_id=report_id, doc_type=clean_type)
+    if not file_path:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"No {clean_type} document found for report #{report_id}."
+        )
+
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp"
+    }
+    media_type = mime_map.get(ext, "image/jpeg")
+    return FileResponse(file_path, media_type=media_type)
+
+
+@router.patch("/{report_id}/admin-verification", response_model=FieldReportDetailResponse)
+def update_admin_verification(
+    report_id: int,
+    payload: AadhaarVerificationUpdate,
+    background_tasks: BackgroundTasks,
+    admin_user: User = Depends(get_current_admin_user_flexible),
+    db: Session = Depends(get_db)
+):
+    """
+    Disaster Authority Admin verification action on field report & citizen identity.
+    Accepts: VERIFIED, REJECTED, or RE_UPLOAD_REQUIRED.
+    When verified, automatically triggers regional SMS alerts to citizens in affected NER state.
+    """
+    report, became_verified = FieldReportService.update_admin_verification(
+        db=db,
+        report_id=report_id,
+        verification_status=payload.verification_status,
+        verification_note=payload.verification_note,
+        verified_by=admin_user.name or admin_user.email
+    )
+
+    # Automated SMS Trigger if report just became VERIFIED
+    if became_verified:
+        detected_state = get_ner_state_name(report.latitude, report.longitude) or "North Eastern Region"
+        recipients = SmsNotificationService.get_recipients_for_region(db, detected_state)
+        if recipients:
+            sms_body = SmsNotificationService.format_report_alert_sms(report, detected_state)
+            background_tasks.add_task(
+                SmsNotificationService.broadcast_regional_alert,
+                message=sms_body,
+                recipients=recipients,
+                state_name=detected_state,
+                severity=str(report.severity)
+            )
+
+    detail = FieldReportService.get_report_detail(db=db, report_id=report_id)
+    if not detail:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Field report with ID {report_id} not found."
+        )
+    return detail

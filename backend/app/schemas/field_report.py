@@ -68,9 +68,16 @@ class FieldReportCreate(BaseModel):
     longitude: float = Field(..., ge=-180.0, le=180.0, description="Longitude of observation (-180 to 180)")
     reporter_type: ReporterType = Field(default=ReporterType.CITIZEN, description="Role of the submitter")
     severity: ReportSeverity = Field(default=ReportSeverity.MEDIUM, description="Estimated hazard severity level")
+    full_name: Optional[str] = Field(None, max_length=150, description="Full name of observer")
+    aadhaar_number: Optional[str] = Field(None, description="12-digit Aadhaar number for ground verification")
 
 class FieldReportStatusUpdate(BaseModel):
     status: ReportStatus = Field(..., description="Updated operational verification status")
+    verification_note: Optional[str] = Field(None, description="Optional verification note/reason")
+
+class AadhaarVerificationUpdate(BaseModel):
+    verification_status: str = Field(..., description="VERIFIED | REJECTED | RE_UPLOAD_REQUIRED")
+    verification_note: Optional[str] = Field(None, max_length=2000, description="Admin verification note or feedback")
 
 class FieldReportResponse(BaseModel):
     id: int
@@ -86,6 +93,17 @@ class FieldReportResponse(BaseModel):
     detected_state: Optional[str] = None
     notification_dispatched: Optional[bool] = None
     recipients_notified: Optional[int] = None
+    # Jio Tag & Aadhaar Verification Info (Secure & Masked)
+    full_name: Optional[str] = None
+    aadhaar_number: Optional[str] = None  # Strictly masked e.g. XXXX-XXXX-1234
+    verification_status: Optional[str] = "PENDING"
+    verification_note: Optional[str] = None
+    verified_by: Optional[str] = None
+    verified_at: Optional[datetime] = None
+    has_aadhaar_card: Optional[bool] = False
+    has_aadhaar_qr: Optional[bool] = False
+    has_jio_tag_image: Optional[bool] = False
+    jio_tag_image_url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -213,6 +231,13 @@ class ReviewQueueItemResponse(BaseModel):
     observation_status: ObservationStatus = Field(..., description="Observation category")
     evidence_confidence: EvidenceConfidence = Field(..., description="Confidence classification")
     exif_consistency_summary: Optional[str] = Field(None, description="EXIF GPS consistency summary across attached photos")
+    full_name: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    verification_status: Optional[str] = "PENDING"
+    verification_note: Optional[str] = None
+    has_aadhaar_card: Optional[bool] = False
+    has_aadhaar_qr: Optional[bool] = False
+    has_jio_tag_image: Optional[bool] = False
 
     class Config:
         from_attributes = True

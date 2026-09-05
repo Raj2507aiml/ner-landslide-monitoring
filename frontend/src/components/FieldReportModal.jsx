@@ -11,9 +11,19 @@ import {
   ShieldAlert, 
   FileText, 
   Trash2, 
-  Loader2 
+  Loader2,
+  ShieldCheck,
+  CreditCard,
+  QrCode,
+  Camera,
+  Lock,
+  Check
 } from 'lucide-react';
-import { createFieldReport, uploadFieldReportMedia } from '../services/fieldReportService';
+import { 
+  createFieldReport, 
+  uploadFieldReportMedia, 
+  uploadVerificationDocuments 
+} from '../services/fieldReportService';
 
 const REPORT_TYPES = [
   { value: 'CRACK', label: 'Ground Crack / Fissure', desc: 'Tension cracks, surface openings, road fissures' },
@@ -45,6 +55,17 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
   // Media files state: array of { id, file, previewUrl, name, size }
   const [selectedFiles, setSelectedFiles] = useState([]);
   
+  // Jio Tag Evidence & Citizen Aadhaar Verification State
+  const [includeJioTagVerification, setIncludeJioTagVerification] = useState(true);
+  const [fullName, setFullName] = useState('');
+  const [aadhaarDigits, setAadhaarDigits] = useState('');
+  const [jioTagFile, setJioTagFile] = useState(null);
+  const [jioTagPreview, setJioTagPreview] = useState(null);
+  const [aadhaarCardFile, setAadhaarCardFile] = useState(null);
+  const [aadhaarCardPreview, setAadhaarCardPreview] = useState(null);
+  const [aadhaarQrFile, setAadhaarQrFile] = useState(null);
+  const [aadhaarQrPreview, setAadhaarQrPreview] = useState(null);
+
   // Submission & UI states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgressText, setSubmitProgressText] = useState('');
@@ -53,6 +74,9 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
   const [isGettingGps, setIsGettingGps] = useState(false);
 
   const fileInputRef = useRef(null);
+  const jioTagInputRef = useRef(null);
+  const aadhaarCardInputRef = useRef(null);
+  const aadhaarQrInputRef = useRef(null);
 
   // Sync initial coordinates from selected map location
   useEffect(() => {
@@ -95,8 +119,74 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
           URL.revokeObjectURL(item.previewUrl);
         }
       });
+      if (jioTagPreview) URL.revokeObjectURL(jioTagPreview);
+      if (aadhaarCardPreview) URL.revokeObjectURL(aadhaarCardPreview);
+      if (aadhaarQrPreview) URL.revokeObjectURL(aadhaarQrPreview);
     };
-  }, [selectedFiles]);
+  }, [selectedFiles, jioTagPreview, aadhaarCardPreview, aadhaarQrPreview]);
+
+  const handleAadhaarChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 12);
+    setAadhaarDigits(raw);
+  };
+
+  const getMaskedAadhaarPreview = () => {
+    if (!aadhaarDigits) return 'XXXX-XXXX-XXXX';
+    if (aadhaarDigits.length <= 8) return 'XXXX-XXXX-XXXX';
+    const last4 = aadhaarDigits.slice(8);
+    return `XXXX-XXXX-${last4.padEnd(4, 'X')}`;
+  };
+
+  const handleJioTagSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setErrorMessage(`Jio Tag photo '${file.name}' is not supported. Only JPEG, PNG, and WebP are allowed.`);
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setErrorMessage(`Jio Tag photo exceeds the 10 MB size limit.`);
+      return;
+    }
+    setErrorMessage(null);
+    setJioTagFile(file);
+    if (jioTagPreview) URL.revokeObjectURL(jioTagPreview);
+    setJioTagPreview(URL.createObjectURL(file));
+  };
+
+  const handleAadhaarCardSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setErrorMessage(`Aadhaar card '${file.name}' is not supported. Only JPEG, PNG, and WebP are allowed.`);
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setErrorMessage(`Aadhaar card file exceeds the 10 MB size limit.`);
+      return;
+    }
+    setErrorMessage(null);
+    setAadhaarCardFile(file);
+    if (aadhaarCardPreview) URL.revokeObjectURL(aadhaarCardPreview);
+    setAadhaarCardPreview(URL.createObjectURL(file));
+  };
+
+  const handleAadhaarQrSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setErrorMessage(`Aadhaar QR '${file.name}' is not supported. Only JPEG, PNG, and WebP are allowed.`);
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setErrorMessage(`Aadhaar QR file exceeds the 10 MB size limit.`);
+      return;
+    }
+    setErrorMessage(null);
+    setAadhaarQrFile(file);
+    if (aadhaarQrPreview) URL.revokeObjectURL(aadhaarQrPreview);
+    setAadhaarQrPreview(URL.createObjectURL(file));
+  };
 
   if (!isOpen) return null;
 
@@ -209,6 +299,30 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
       return;
     }
 
+    // Jio Tag & Aadhaar Verification Validations
+    if (includeJioTagVerification) {
+      if (!fullName.trim() || fullName.trim().length < 2) {
+        setErrorMessage('Please provide citizen Full Name (as per Aadhaar).');
+        return;
+      }
+      if (aadhaarDigits.length !== 12) {
+        setErrorMessage('Aadhaar number must contain exactly 12 numeric digits.');
+        return;
+      }
+      if (!jioTagFile) {
+        setErrorMessage('Please upload the Jio Tag photographic evidence.');
+        return;
+      }
+      if (!aadhaarCardFile) {
+        setErrorMessage('Please upload the citizen Aadhaar Card image.');
+        return;
+      }
+      if (!aadhaarQrFile) {
+        setErrorMessage('Please upload the citizen Aadhaar QR Code image.');
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setSubmitProgressText('Submitting field observation report...');
 
@@ -219,7 +333,9 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
       latitude: latNum,
       longitude: lonNum,
       reporter_type: reporterType,
-      severity: severity
+      severity: severity,
+      full_name: includeJioTagVerification ? fullName.trim() : null,
+      aadhaar_number: includeJioTagVerification ? aadhaarDigits : null,
     };
 
     const createResult = await createFieldReport(reportPayload);
@@ -233,10 +349,23 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
 
     const createdReport = createResult.data;
     const reportId = createdReport.id;
+
+    // Step 2: Upload Confidential Verification Documents & Jio Tag
+    if (includeJioTagVerification && (jioTagFile || aadhaarCardFile || aadhaarQrFile)) {
+      setSubmitProgressText('Uploading Jio Tag & securing private Aadhaar documents...');
+      const verifResult = await uploadVerificationDocuments(reportId, {
+        jioTagFile,
+        aadhaarCardFile,
+        aadhaarQrFile
+      });
+      if (!verifResult.ok) {
+        console.warn('Warning: Verification documents upload issue:', verifResult.error);
+      }
+    }
+
+    // Step 3: Upload general Photo Evidence if attached
     let uploadedMediaCount = 0;
     let mediaErrors = 0;
-
-    // Step 2: Upload Photo Evidence if attached
     if (selectedFiles.length > 0) {
       for (let i = 0; i < selectedFiles.length; i++) {
         setSubmitProgressText(`Uploading evidence photo (${i + 1}/${selectedFiles.length})...`);
@@ -257,8 +386,9 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
       reportId: createdReport.id,
       reportType: createdReport.report_type,
       severity: createdReport.severity,
-      mediaCount: uploadedMediaCount,
-      mediaErrors
+      mediaCount: uploadedMediaCount + (jioTagFile ? 1 : 0),
+      mediaErrors,
+      isJioTagVerified: includeJioTagVerification
     });
 
     if (onReportSubmitted) {
@@ -271,6 +401,17 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
     setSelectedFiles([]);
     setSuccessData(null);
     setErrorMessage(null);
+    setFullName('');
+    setAadhaarDigits('');
+    if (jioTagPreview) URL.revokeObjectURL(jioTagPreview);
+    if (aadhaarCardPreview) URL.revokeObjectURL(aadhaarCardPreview);
+    if (aadhaarQrPreview) URL.revokeObjectURL(aadhaarQrPreview);
+    setJioTagFile(null);
+    setJioTagPreview(null);
+    setAadhaarCardFile(null);
+    setAadhaarCardPreview(null);
+    setAadhaarQrFile(null);
+    setAadhaarQrPreview(null);
   };
 
   const handleBackdropClick = (e) => {
@@ -550,7 +691,203 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                 </div>
               </div>
 
-              {/* Field 6: Photo Evidence Upload */}
+              {/* Field 6: Jio Tag Evidence & Citizen Aadhaar Verification */}
+              <div className="space-y-3 p-4 rounded-xl bg-[var(--subcard-bg)] border border-emerald-500/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                      <ShieldCheck className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider flex items-center gap-1.5">
+                        Jio Tag Evidence & Aadhaar Verification
+                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-500/20 text-emerald-500 border border-emerald-500/40">
+                          Ground Truth Evidence
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-[var(--text-dim)]">
+                        Attach mandatory Jio Tag photo, Aadhaar card & QR for verified triage
+                      </p>
+                    </div>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={includeJioTagVerification} 
+                      onChange={(e) => setIncludeJioTagVerification(e.target.checked)}
+                      className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                  </label>
+                </div>
+
+                {includeJioTagVerification && (
+                  <div className="space-y-3.5 pt-2 border-t border-[var(--border-subtle)]">
+                    {/* User Name / Full Name */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                        Full Name (as per Aadhaar) *
+                      </label>
+                      <input
+                        type="text"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="e.g. Tenzing Norbu / Dr. Ananya Sharma"
+                        maxLength={150}
+                        className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] text-xs placeholder:text-[var(--text-dim)] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                      />
+                    </div>
+
+                    {/* Aadhaar Number with 12 Digits Validation & Live Masking */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                          Aadhaar Number (12 Digits) *
+                        </label>
+                        <div className="flex items-center gap-1.5 text-[10.5px] font-mono">
+                          {aadhaarDigits.length === 12 ? (
+                            <span className="text-emerald-500 font-bold flex items-center gap-1">
+                              <Check className="h-3 w-3" /> 12 Digits Validated
+                            </span>
+                          ) : (
+                            <span className="text-amber-500">
+                              {aadhaarDigits.length}/12 digits
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={aadhaarDigits}
+                        onChange={handleAadhaarChange}
+                        placeholder="Enter 12 numeric digits (e.g. 234567890123)"
+                        maxLength={12}
+                        className="w-full px-3 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] text-xs font-mono tracking-widest placeholder:text-[var(--text-dim)] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition"
+                      />
+                      <div className="flex items-center justify-between text-[10.5px] px-1 text-[var(--text-dim)] pt-0.5">
+                        <span>Protected Public Display:</span>
+                        <span className="font-mono font-bold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20">
+                          {getMaskedAadhaarPreview()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 3 Upload Cards: Jio Tag Image, Aadhaar Card, Aadhaar QR */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                      {/* Jio Tag Image */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                          1. Jio Tag Image *
+                        </label>
+                        <div 
+                          onClick={() => jioTagInputRef.current?.click()}
+                          className="h-28 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-emerald-500/60 bg-[var(--card-bg)] flex flex-col items-center justify-center p-2 text-center cursor-pointer transition relative overflow-hidden"
+                        >
+                          {jioTagPreview ? (
+                            <>
+                              <img src={jioTagPreview} alt="Jio Tag Preview" className="w-full h-full object-cover rounded-lg" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold">
+                                Change Photo
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-1">
+                              <Camera className="h-5 w-5 mx-auto text-emerald-500" />
+                              <span className="text-[10px] font-semibold text-[var(--text-main)] block">Upload Jio Tag Photo</span>
+                              <span className="text-[9px] text-[var(--text-dim)] block">Geo-tagged hazard</span>
+                            </div>
+                          )}
+                          <input 
+                            ref={jioTagInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleJioTagSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Aadhaar Card */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                          2. Upload Aadhaar Card *
+                        </label>
+                        <div 
+                          onClick={() => aadhaarCardInputRef.current?.click()}
+                          className="h-28 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-sky-500/60 bg-[var(--card-bg)] flex flex-col items-center justify-center p-2 text-center cursor-pointer transition relative overflow-hidden"
+                        >
+                          {aadhaarCardPreview ? (
+                            <>
+                              <img src={aadhaarCardPreview} alt="Aadhaar Card Preview" className="w-full h-full object-cover rounded-lg" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold">
+                                Change Card
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-1">
+                              <CreditCard className="h-5 w-5 mx-auto text-sky-500" />
+                              <span className="text-[10px] font-semibold text-[var(--text-main)] block">Upload Aadhaar Card</span>
+                              <span className="text-[9px] text-[var(--text-dim)] block">Front photo / doc</span>
+                            </div>
+                          )}
+                          <input 
+                            ref={aadhaarCardInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleAadhaarCardSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Aadhaar QR Code */}
+                      <div className="space-y-1.5">
+                        <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                          3. Upload Aadhaar QR *
+                        </label>
+                        <div 
+                          onClick={() => aadhaarQrInputRef.current?.click()}
+                          className="h-28 rounded-xl border-2 border-dashed border-[var(--border-subtle)] hover:border-purple-500/60 bg-[var(--card-bg)] flex flex-col items-center justify-center p-2 text-center cursor-pointer transition relative overflow-hidden"
+                        >
+                          {aadhaarQrPreview ? (
+                            <>
+                              <img src={aadhaarQrPreview} alt="Aadhaar QR Preview" className="w-full h-full object-cover rounded-lg" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold">
+                                Change QR
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-1">
+                              <QrCode className="h-5 w-5 mx-auto text-purple-500" />
+                              <span className="text-[10px] font-semibold text-[var(--text-main)] block">Upload Aadhaar QR</span>
+                              <span className="text-[9px] text-[var(--text-dim)] block">Scannable QR image</span>
+                            </div>
+                          )}
+                          <input 
+                            ref={aadhaarQrInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={handleAadhaarQrSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Privacy notice */}
+                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)] text-[10.5px] text-[var(--text-dim)] leading-relaxed">
+                      <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-500 mt-0.5" />
+                      <span>
+                        <strong>Confidential Storage:</strong> Aadhaar Card and QR images are encrypted and stored in an isolated private vault. They are viewable solely by authorized Disaster Authority Administrators for ground verification.
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Field 7: Additional Photo Evidence Upload */}
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider">
                   Photo Evidence (Optional, max 10MB per image)

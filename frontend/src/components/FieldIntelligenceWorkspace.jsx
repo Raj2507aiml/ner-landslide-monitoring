@@ -18,12 +18,21 @@ import {
   XCircle, 
   CheckCheck,
   AlertOctagon,
-  Layers
+  Layers,
+  ShieldCheck,
+  CreditCard,
+  QrCode,
+  Camera,
+  Lock,
+  RotateCcw,
+  Check
 } from 'lucide-react';
 import { 
   getReviewQueue, 
   getFieldReportById, 
-  updateReportStatus 
+  updateReportStatus,
+  updateAdminVerification,
+  getAadhaarDocumentUrl
 } from '../services/fieldReportService';
 import { getMediaBaseUrl } from '../services/apiConfig';
 
@@ -72,6 +81,8 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
   const [selectedReportDetail, setSelectedReportDetail] = useState(null);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isVerifyingIdentity, setIsVerifyingIdentity] = useState(false);
+  const [verificationNote, setVerificationNote] = useState('');
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
 
@@ -167,6 +178,49 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
       isMounted = false;
     };
   }, [selectedReportId]);
+
+  // Synchronize verification note when detail changes
+  useEffect(() => {
+    if (selectedReportDetail) {
+      setVerificationNote(selectedReportDetail.verification_note || '');
+    } else {
+      setVerificationNote('');
+    }
+  }, [selectedReportDetail]);
+
+  // Handle Admin Verification Decision (Jio Tag & Aadhaar manual review)
+  const handleAdminVerificationAction = async (decisionStatus) => {
+    if (!selectedReportId) return;
+
+    setIsVerifyingIdentity(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    const res = await updateAdminVerification(selectedReportId, decisionStatus, verificationNote);
+    setIsVerifyingIdentity(false);
+
+    if (res.ok) {
+      if (decisionStatus === 'VERIFIED') {
+        setActionSuccess(`Evidence and citizen identity verified! Observation confirmed as Ground Truth.`);
+      } else if (decisionStatus === 'REJECTED') {
+        setActionSuccess(`Observation rejected. Citizen verification marked as REJECTED.`);
+      } else if (decisionStatus === 'RE_UPLOAD_REQUIRED') {
+        setActionSuccess(`Status set to Re-upload Required. Submitter notified to provide clearer Aadhaar / Jio Tag evidence.`);
+      }
+
+      // Refresh detailed view & queue
+      const updatedDetail = await getFieldReportById(selectedReportId);
+      if (updatedDetail.ok) {
+        setSelectedReportDetail(updatedDetail.data);
+      }
+      fetchQueue();
+      if (onReportUpdated) {
+        onReportUpdated(res.data);
+      }
+    } else {
+      setActionError(res.error || `Failed to update verification status to ${decisionStatus}.`);
+    }
+  };
 
   // Handle Status Update
   const handleTransitionStatus = async (newStatus) => {
@@ -448,6 +502,21 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                         </div>
 
                         <div className="flex items-center gap-2">
+                          {item.has_jio_tag_image && (
+                            <span className="inline-flex items-center gap-0.5 text-emerald-500 font-semibold" title="Jio Tag Evidence Attached">
+                              <Camera className="h-3 w-3" /> Jio
+                            </span>
+                          )}
+                          {item.verification_status === 'VERIFIED' && (
+                            <span className="inline-flex items-center gap-0.5 text-emerald-500 font-bold" title="Identity & Jio Tag Verified">
+                              <Check className="h-3 w-3" /> ID
+                            </span>
+                          )}
+                          {item.verification_status === 'RE_UPLOAD_REQUIRED' && (
+                            <span className="inline-flex items-center gap-0.5 text-amber-500 font-bold" title="Re-upload Requested">
+                              <RotateCcw className="h-3 w-3" />
+                            </span>
+                          )}
                           {item.media_count > 0 && (
                             <span className="inline-flex items-center gap-1 text-sky-500 font-medium">
                               <ImageIcon className="h-3 w-3" />
@@ -570,7 +639,243 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                   </div>
                 </div>
 
-                {/* Section 3: Photo Evidence Gallery */}
+                {/* Section 3: Jio Tag Evidence & Citizen Aadhaar Verification */}
+                <div className="space-y-4 bg-[var(--card-bg)] p-4 rounded-xl border border-emerald-500/30">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider flex items-center gap-2">
+                      <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                        <ShieldCheck className="h-4 w-4" />
+                      </div>
+                      <span>Jio Tag Evidence & Citizen Identity Verification</span>
+                    </label>
+
+                    {/* Verification Status Badge */}
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-bold border ${
+                        selectedReportDetail.verification_status === 'VERIFIED'
+                          ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                          : selectedReportDetail.verification_status === 'REJECTED'
+                          ? 'bg-rose-500/10 text-rose-500 border-rose-500/30'
+                          : selectedReportDetail.verification_status === 'RE_UPLOAD_REQUIRED'
+                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                          : 'bg-amber-500/10 text-amber-500 border-amber-500/30'
+                      }`}>
+                        {selectedReportDetail.verification_status === 'VERIFIED' && '✅ VERIFIED'}
+                        {selectedReportDetail.verification_status === 'REJECTED' && '❌ REJECTED'}
+                        {selectedReportDetail.verification_status === 'RE_UPLOAD_REQUIRED' && '⚠️ RE-UPLOAD REQUESTED'}
+                        {(!selectedReportDetail.verification_status || selectedReportDetail.verification_status === 'PENDING') && '⏳ PENDING REVIEW'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Citizen Identity Details */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div className="p-2.5 bg-[var(--subcard-bg)] rounded-lg border border-[var(--border-subtle)]">
+                      <span className="text-[10px] text-[var(--text-dim)] uppercase block">User Name</span>
+                      <span className="font-semibold text-[var(--text-main)] truncate block">
+                        {selectedReportDetail.full_name || '👤 Anonymous Citizen'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-[var(--subcard-bg)] rounded-lg border border-[var(--border-subtle)]">
+                      <span className="text-[10px] text-[var(--text-dim)] uppercase block">Masked Aadhaar Number</span>
+                      <span className="font-mono font-bold text-emerald-500 block">
+                        {selectedReportDetail.aadhaar_number || 'Not Submitted'}
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-[var(--subcard-bg)] rounded-lg border border-[var(--border-subtle)]">
+                      <span className="text-[10px] text-[var(--text-dim)] uppercase block">Upload Timestamp</span>
+                      <span className="text-[11px] text-[var(--text-main)] block">
+                        {new Date(selectedReportDetail.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Evidence Inspection Trio: Jio Tag Photo, Aadhaar Card, Aadhaar QR */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    
+                    {/* Jio Tag Image */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Camera className="h-3 w-3 text-emerald-500" /> Jio Tag Photo
+                        </span>
+                        {selectedReportDetail.has_jio_tag_image && (
+                          <span className="text-[9.5px] text-emerald-500 font-bold">Attached</span>
+                        )}
+                      </span>
+
+                      {selectedReportDetail.has_jio_tag_image && selectedReportDetail.jio_tag_image_url ? (
+                        <div 
+                          onClick={() => setActivePhotoUrl(`${getMediaBaseUrl()}${selectedReportDetail.jio_tag_image_url}`)}
+                          className="group relative h-40 bg-[var(--modal-bg)] rounded-xl border border-[var(--border-subtle)] overflow-hidden cursor-pointer hover:border-emerald-500/50 transition flex items-center justify-center"
+                        >
+                          <img 
+                            src={`${getMediaBaseUrl()}${selectedReportDetail.jio_tag_image_url}`} 
+                            alt="Jio Tag Evidence"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white text-xs font-semibold">
+                            <Eye className="h-4 w-4" /> Enlarge
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--subcard-bg)] flex flex-col items-center justify-center p-3 text-center text-[var(--text-dim)] text-xs">
+                          <Camera className="h-6 w-6 mb-1 text-[var(--text-dim)]" />
+                          <span>No Jio Tag photo provided</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Aadhaar Card Document */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <CreditCard className="h-3 w-3 text-sky-500" /> Aadhaar Card
+                        </span>
+                        <span className="flex items-center gap-1 text-[9.5px] font-bold text-amber-500">
+                          <Lock className="h-2.5 w-2.5" /> Confidential
+                        </span>
+                      </span>
+
+                      {selectedReportDetail.has_aadhaar_card ? (
+                        <div 
+                          onClick={() => setActivePhotoUrl(getAadhaarDocumentUrl(selectedReportDetail.id, 'card'))}
+                          className="group relative h-40 bg-[var(--modal-bg)] rounded-xl border border-[var(--border-subtle)] overflow-hidden cursor-pointer hover:border-sky-500/50 transition flex items-center justify-center"
+                        >
+                          <img 
+                            src={getAadhaarDocumentUrl(selectedReportDetail.id, 'card')} 
+                            alt="Aadhaar Card"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              if (e.currentTarget.nextElementSibling) {
+                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div className="hidden absolute inset-0 bg-[var(--subcard-bg)] flex-col items-center justify-center p-2 text-center text-xs text-[var(--text-dim)]">
+                            <Lock className="h-5 w-5 mb-1 text-amber-500" />
+                            <span>Confidential Doc (Admin Only)</span>
+                          </div>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white text-xs font-semibold">
+                            <Eye className="h-4 w-4" /> Inspect Card
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--subcard-bg)] flex flex-col items-center justify-center p-3 text-center text-[var(--text-dim)] text-xs">
+                          <CreditCard className="h-6 w-6 mb-1 text-[var(--text-dim)]" />
+                          <span>No Aadhaar card uploaded</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Aadhaar QR Code */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <QrCode className="h-3 w-3 text-purple-500" /> Aadhaar QR
+                        </span>
+                        <span className="flex items-center gap-1 text-[9.5px] font-bold text-amber-500">
+                          <Lock className="h-2.5 w-2.5" /> Confidential
+                        </span>
+                      </span>
+
+                      {selectedReportDetail.has_aadhaar_qr ? (
+                        <div 
+                          onClick={() => setActivePhotoUrl(getAadhaarDocumentUrl(selectedReportDetail.id, 'qr'))}
+                          className="group relative h-40 bg-[var(--modal-bg)] rounded-xl border border-[var(--border-subtle)] overflow-hidden cursor-pointer hover:border-purple-500/50 transition flex items-center justify-center"
+                        >
+                          <img 
+                            src={getAadhaarDocumentUrl(selectedReportDetail.id, 'qr')} 
+                            alt="Aadhaar QR"
+                            className="w-full h-full object-contain p-2 group-hover:scale-105 transition duration-300"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              if (e.currentTarget.nextElementSibling) {
+                                e.currentTarget.nextElementSibling.style.display = 'flex';
+                              }
+                            }}
+                          />
+                          <div className="hidden absolute inset-0 bg-[var(--subcard-bg)] flex-col items-center justify-center p-2 text-center text-xs text-[var(--text-dim)]">
+                            <Lock className="h-5 w-5 mb-1 text-amber-500" />
+                            <span>Confidential QR (Admin Only)</span>
+                          </div>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white text-xs font-semibold">
+                            <Eye className="h-4 w-4" /> Inspect QR
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--subcard-bg)] flex flex-col items-center justify-center p-3 text-center text-[var(--text-dim)] text-xs">
+                          <QrCode className="h-6 w-6 mb-1 text-[var(--text-dim)]" />
+                          <span>No Aadhaar QR uploaded</span>
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Verification Note & Admin Review Actions */}
+                  <div className="space-y-2 pt-2 border-t border-[var(--border-subtle)]">
+                    <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+                      Verification Note / Inspection Remarks
+                    </label>
+                    <textarea 
+                      value={verificationNote}
+                      onChange={(e) => setVerificationNote(e.target.value)}
+                      placeholder="Add official verification note (e.g. Jio Tag photo confirmed matching slope fissure; Aadhaar identity validated)..."
+                      rows={2}
+                      maxLength={1000}
+                      className="w-full px-3 py-2 rounded-xl bg-[var(--subcard-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] text-xs placeholder:text-[var(--text-dim)] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition resize-none"
+                    />
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                      <div className="text-[10.5px] text-[var(--text-dim)]">
+                        {selectedReportDetail.verified_by ? (
+                          <span>Last verified by <strong>{selectedReportDetail.verified_by}</strong> on {new Date(selectedReportDetail.verified_at).toLocaleDateString()}</span>
+                        ) : (
+                          <span>Manual inspection required before marking Ground Truth</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {/* 1. Request Re-upload */}
+                        <button
+                          type="button"
+                          onClick={() => handleAdminVerificationAction('RE_UPLOAD_REQUIRED')}
+                          disabled={isVerifyingIdentity}
+                          className="px-3 py-1.5 rounded-lg bg-[var(--subcard-bg)] hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                        >
+                          <RotateCcw className="h-3.5 w-3.5" /> Request Re-upload
+                        </button>
+
+                        {/* 2. Reject */}
+                        <button
+                          type="button"
+                          onClick={() => handleAdminVerificationAction('REJECTED')}
+                          disabled={isVerifyingIdentity}
+                          className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 text-xs font-semibold transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> Reject
+                        </button>
+
+                        {/* 3. Verify */}
+                        <button
+                          type="button"
+                          onClick={() => handleAdminVerificationAction('VERIFIED')}
+                          disabled={isVerifyingIdentity}
+                          className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-950/40 transition disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Check className="h-3.5 w-3.5" /> Verify
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Section 4: Photo Evidence Gallery */}
                 <div className="space-y-3 bg-[var(--card-bg)] p-4 rounded-xl border border-[var(--border-subtle)]">
                   <label className="block text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center justify-between">
                     <span>Photographic Evidence ({selectedReportDetail.media?.length || 0})</span>

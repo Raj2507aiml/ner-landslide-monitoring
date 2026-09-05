@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, status
 from sqlalchemy.orm import Session
 
 from app.database.session import get_db
@@ -102,6 +102,59 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
             detail="Access Denied: Administrative privileges required. Public citizen accounts cannot access Incident Command operations."
         )
     return current_user
+
+def get_current_admin_user_flexible(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Dependency to enforce Admin role, accepting either Authorization Bearer header
+    or ?token=<jwt> query parameter (crucial for secure image <img> element rendering).
+    """
+    seed_initial_users_if_needed(db)
+    raw_token = None
+    if authorization and authorization.startswith("Bearer "):
+        raw_token = authorization.split(" ")[1].strip()
+    elif token:
+        raw_token = token.strip()
+
+    if not raw_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token required. Please sign in.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    payload = decode_access_token(raw_token)
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session token. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("sub")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        email = payload.get("email")
+        if email:
+            user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User associated with token not found.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access Denied: Administrative privileges required to access verification evidence."
+        )
+
+    return user
 
 @router.post("/register", response_model=TokenResponse)
 def register_user(req: UserRegister, db: Session = Depends(get_db)):

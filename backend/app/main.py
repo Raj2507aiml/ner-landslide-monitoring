@@ -4,11 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from app.core.config import settings, BASE_DIR
 from app.api.router import api_router
-from app.database.session import engine, Base
+from app.database.session import engine, Base, migrate_db
 import app.models  # Register models for Base.metadata
 
-# Create database tables
+# Create database tables and auto-migrate schema
 Base.metadata.create_all(bind=engine)
+migrate_db(engine)
 
 # Check if running in production mode
 is_production = settings.ENVIRONMENT.lower() == "production"
