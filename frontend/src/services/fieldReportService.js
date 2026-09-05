@@ -14,10 +14,13 @@ export async function createFieldReport(reportData) {
     if (!response.ok) {
       try {
         const errorData = await response.json();
+        const detailMsg = typeof errorData.detail === 'string' 
+          ? errorData.detail 
+          : (Array.isArray(errorData.detail) ? errorData.detail.map(d => d.msg || d.message).join(', ') : (errorData.message || 'Failed to create field report.'));
         return {
           ok: false,
           status: response.status,
-          error: errorData.detail || errorData.message || 'Failed to create field report.',
+          error: detailMsg,
           data: errorData
         };
       } catch {
@@ -39,7 +42,7 @@ export async function createFieldReport(reportData) {
     return {
       ok: false,
       status: 0,
-      error: 'Unable to connect to the monitoring server.'
+      error: 'Unable to connect to the monitoring server. Please ensure the server is online or try again in a few moments.'
     };
   }
 }

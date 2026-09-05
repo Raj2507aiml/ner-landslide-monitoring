@@ -15,8 +15,25 @@ import json
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, Optional, Tuple
 from difflib import SequenceMatcher
-import numpy as np
-import cv2
+
+try:
+    import numpy as np
+except Exception:
+    np = None
+
+try:
+    import cv2
+    HAS_CV2 = True
+except Exception:
+    cv2 = None
+    HAS_CV2 = False
+
+try:
+    from PIL import Image as PILImage
+    HAS_PIL = True
+except Exception:
+    PILImage = None
+    HAS_PIL = False
 
 # =========================================================================
 # Verhoeff Mathematical Checksum Tables (Dihedral Group D5)
@@ -75,6 +92,9 @@ class AadhaarVerificationService:
         """
         if not image_path or not os.path.exists(image_path):
             return False, None, {}
+
+        if not HAS_CV2 or cv2 is None:
+            return False, None, {"note": "QR detector requires OpenCV runtime."}
 
         try:
             img = cv2.imread(image_path)
@@ -217,27 +237,44 @@ class AadhaarVerificationService:
         if not card_image_path or not os.path.exists(card_image_path):
             return result
 
-        try:
-            img = cv2.imread(card_image_path)
-            if img is None:
-                return result
+        # 1. Use Pillow if available (standard and always works)
+        if HAS_PIL and PILImage is not None:
+            try:
+                with PILImage.open(card_image_path) as im:
+                    w, h = im.size
+                    result["width"] = int(w)
+                    result["height"] = int(h)
+                    if h > 0:
+                        aspect = round(max(w, h) / min(w, h), 2)
+                        result["aspect_ratio"] = aspect
+                        if 1.20 <= aspect <= 2.10:
+                            result["has_id_card_proportions"] = True
+                    if w >= 200 and h >= 200:
+                        result["is_valid_format"] = True
+                    return result
+            except Exception:
+                pass
 
-            h, w = img.shape[:2]
-            result["width"] = int(w)
-            result["height"] = int(h)
+        # 2. Use OpenCV if Pillow failed
+        if HAS_CV2 and cv2 is not None:
+            try:
+                img = cv2.imread(card_image_path)
+                if img is not None:
+                    h, w = img.shape[:2]
+                    result["width"] = int(w)
+                    result["height"] = int(h)
+                    if h > 0:
+                        aspect = round(max(w, h) / min(w, h), 2)
+                        result["aspect_ratio"] = aspect
+                        if 1.20 <= aspect <= 2.10:
+                            result["has_id_card_proportions"] = True
+                    if w >= 200 and h >= 200:
+                        result["is_valid_format"] = True
+                    return result
+            except Exception:
+                pass
 
-            if h > 0:
-                aspect = round(max(w, h) / min(w, h), 2)
-                result["aspect_ratio"] = aspect
-                if 1.20 <= aspect <= 2.10:
-                    result["has_id_card_proportions"] = True
-
-            if w >= 200 and h >= 200:
-                result["is_valid_format"] = True
-
-            return result
-        except Exception:
-            return result
+        return result
 
     @classmethod
     def verify_aadhaar_evidence(

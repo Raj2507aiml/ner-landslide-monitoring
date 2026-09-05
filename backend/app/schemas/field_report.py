@@ -8,8 +8,9 @@ and operational authority review workflows.
 
 from enum import Enum
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any, Union
+import json
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.field_report_media import FieldReportMediaResponse
 
@@ -106,7 +107,7 @@ class FieldReportResponse(BaseModel):
     jio_tag_image_url: Optional[str] = None
     # Automated Aadhaar Verification & AI Inspection
     aadhaar_auto_status: Optional[str] = "UNVERIFIED"
-    aadhaar_verification_details: Optional[Dict[str, Any]] = None
+    aadhaar_verification_details: Optional[Union[Dict[str, Any], str]] = None
     # Jio Tag Spatial Telemetry & Predictive Risk Features
     jio_tag_latitude: Optional[float] = None
     jio_tag_longitude: Optional[float] = None
@@ -114,7 +115,17 @@ class FieldReportResponse(BaseModel):
     jio_tag_captured_at: Optional[datetime] = None
     visual_hazard_score: Optional[float] = None
     predicted_risk_score: Optional[float] = None
-    prediction_details: Optional[Dict[str, Any]] = None
+    prediction_details: Optional[Union[Dict[str, Any], str]] = None
+
+    @field_validator("aadhaar_verification_details", "prediction_details", mode="before")
+    @classmethod
+    def parse_json_details(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except Exception:
+                return v
+        return v
 
     class Config:
         from_attributes = True

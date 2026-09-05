@@ -86,23 +86,33 @@ class FieldReportService:
             masked_aadhaar = f"XXXX-XXXX-{raw_aadhaar[-4:]}"
             aadhaar_hash = hashlib.sha256(raw_aadhaar.encode("utf-8")).hexdigest()
 
-            from app.services.aadhaar_verification_service import AadhaarVerificationService
-            verhoeff_valid = AadhaarVerificationService.validate_verhoeff(raw_aadhaar)
-            if verhoeff_valid:
+            try:
+                from app.services.aadhaar_verification_service import AadhaarVerificationService
+                verhoeff_valid = AadhaarVerificationService.validate_verhoeff(raw_aadhaar)
+                if verhoeff_valid:
+                    aadhaar_auto_status = "UNVERIFIED"
+                    aadhaar_verification_details = json.dumps({
+                        "verhoeff_passed": True,
+                        "auto_status": "UNVERIFIED",
+                        "confidence_score": 0.40,
+                        "audit_reasons": ["12-digit Aadhaar number passed Verhoeff checksum algorithm."]
+                    })
+                else:
+                    aadhaar_auto_status = "INVALID_NOT_AADHAAR"
+                    aadhaar_verification_details = json.dumps({
+                        "verhoeff_passed": False,
+                        "auto_status": "INVALID_NOT_AADHAAR",
+                        "confidence_score": 0.0,
+                        "audit_reasons": ["12-digit Aadhaar number failed Verhoeff checksum algorithm."]
+                    })
+            except Exception as e:
                 aadhaar_auto_status = "UNVERIFIED"
                 aadhaar_verification_details = json.dumps({
-                    "verhoeff_passed": True,
-                    "auto_status": "UNVERIFIED",
-                    "confidence_score": 0.40,
-                    "audit_reasons": ["12-digit Aadhaar number passed Verhoeff checksum algorithm."]
-                })
-            else:
-                aadhaar_auto_status = "INVALID_NOT_AADHAAR"
-                aadhaar_verification_details = json.dumps({
                     "verhoeff_passed": False,
-                    "auto_status": "INVALID_NOT_AADHAAR",
+                    "auto_status": "UNVERIFIED",
+                    "error": str(e),
                     "confidence_score": 0.0,
-                    "audit_reasons": ["12-digit Aadhaar number failed Verhoeff checksum algorithm."]
+                    "audit_reasons": [f"Automated verification deferred: {str(e)}"]
                 })
 
         db_report = FieldReport(

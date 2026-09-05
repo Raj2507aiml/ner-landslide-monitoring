@@ -9,10 +9,20 @@ from uploaded Jio Tag photos to calculate calibrated landslide risk predictions.
 import os
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
-from PIL import Image
-import numpy as np
-import cv2
+from PIL import Image, ImageFilter, ImageStat
 from sqlalchemy.orm import Session
+
+try:
+    import numpy as np
+except Exception:
+    np = None
+
+try:
+    import cv2
+    HAS_CV2 = True
+except Exception:
+    cv2 = None
+    HAS_CV2 = False
 
 from app.services.field_report_media_service import extract_exif_metadata
 from app.services.composite_risk_service import CompositeRiskService
@@ -72,9 +82,9 @@ class JioTagPredictionService:
     @staticmethod
     def analyze_visual_hazard_features(image_path: str) -> Dict[str, Any]:
         """
-        Runs OpenCV computer vision feature extraction on the hazard observation image:
-        1. Canny edge & fissure detection to quantify ground crack and surface rupture density.
-        2. HSV color-space analysis to compute soil/mud exposure ratio vs vegetation.
+        Runs computer vision feature extraction on the hazard observation image:
+        1. Canny edge & fissure detection (or PIL edge gradient) to quantify ground crack and surface rupture density.
+        2. HSV/color analysis to compute soil/mud exposure ratio vs vegetation.
         3. Composite Visual Hazard Score (0.0 to 1.0).
         """
         features = {
@@ -87,51 +97,91 @@ class JioTagPredictionService:
         if not image_path or not os.path.exists(image_path):
             return features
 
+        # Try OpenCV-based extraction if available
+        if HAS_CV2 and cv2 is not None and np is not None:
+            try:
+                img = cv2.imread(image_path)
+                if img is not None:
+                    # Resize to standard analysis resolution (640px width)
+                    h, w = img.shape[:2]
+                    scale = 640.0 / max(w, 640)
+                    new_w, new_h = int(w * scale), int(h * scale)
+                    resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+                    # 1. Edge & Crack Detection via Canny & Blur
+                    gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
+                    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+                    edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
+
+                    total_pixels = float(new_w * new_h)
+                    edge_pixels = float(np.count_nonzero(edges))
+                    # Normalized edge density: typically 0.01 to 0.15 for real slope photos
+                    raw_edge_density = edge_pixels / total_pixels
+                    crack_density = min(1.0, round(raw_edge_density * 8.0, 3))
+                    features["crack_density_index"] = crack_density
+
+                    # 2. Bare Soil / Mudflow Exposure Ratio via HSV
+                    hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
+                    # Brown / Red-brown / Tan soil and rock mask
+                    lower_soil = np.array([8, 30, 40], dtype=np.uint8)
+                    upper_soil = np.array([28, 220, 200], dtype=np.uint8)
+                    soil_mask = cv2.inRange(hsv, lower_soil, upper_soil)
+                    soil_pixels = float(np.count_nonzero(soil_mask))
+                    soil_exposure = min(1.0, round(soil_pixels / total_pixels, 3))
+                    features["soil_exposure_ratio"] = soil_exposure
+
+                    # 3. Composite Visual Hazard Score (0.0 to 1.0)
+                    visual_score = round(0.60 * crack_density + 0.40 * soil_exposure, 2)
+                    features["visual_hazard_score"] = visual_score
+
+                    if visual_score >= 0.65:
+                        features["dominant_visual_feature"] = "ACTIVE_FISSURE_SLOPE_EROSION"
+                    elif visual_score >= 0.35:
+                        features["dominant_visual_feature"] = "MODERATE_SURFACE_DISTURBANCE"
+                    else:
+                        features["dominant_visual_feature"] = "LOW_SURFACE_DEFORMATION"
+
+                    return features
+            except Exception:
+                pass
+
+        # PIL Fallback for headless environments without OpenCV
         try:
-            img = cv2.imread(image_path)
-            if img is None:
+            with Image.open(image_path) as pil_img:
+                rgb = pil_img.convert("RGB")
+                w, h = rgb.size
+                scale = 320.0 / max(w, 320)
+                new_w, new_h = max(1, int(w * scale)), max(1, int(h * scale))
+                small = rgb.resize((new_w, new_h))
+
+                # Edge gradient using FIND_EDGES
+                gray = small.convert("L")
+                edge_img = gray.filter(ImageFilter.FIND_EDGES)
+                stat = ImageStat.Stat(edge_img)
+                avg_edge = stat.mean[0] / 255.0
+                crack_density = min(1.0, round(avg_edge * 4.5, 3))
+                features["crack_density_index"] = crack_density
+
+                # Soil / mud pixel detection (brown/tan tones: R > G > B with reasonable saturation)
+                soil_count = 0
+                pixels = small.getdata()
+                for r, g, b in pixels:
+                    if r > 60 and g > 40 and b < min(r, g) and (r - b) > 20:
+                        soil_count += 1
+                soil_exposure = min(1.0, round(float(soil_count) / float(new_w * new_h), 3))
+                features["soil_exposure_ratio"] = soil_exposure
+
+                visual_score = round(0.60 * crack_density + 0.40 * soil_exposure, 2)
+                features["visual_hazard_score"] = visual_score
+
+                if visual_score >= 0.65:
+                    features["dominant_visual_feature"] = "ACTIVE_FISSURE_SLOPE_EROSION"
+                elif visual_score >= 0.35:
+                    features["dominant_visual_feature"] = "MODERATE_SURFACE_DISTURBANCE"
+                else:
+                    features["dominant_visual_feature"] = "LOW_SURFACE_DEFORMATION"
+
                 return features
-
-            # Resize to standard analysis resolution (640px width)
-            h, w = img.shape[:2]
-            scale = 640.0 / max(w, 640)
-            new_w, new_h = int(w * scale), int(h * scale)
-            resized = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-
-            # 1. Edge & Crack Detection via Canny & Blur
-            gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-            edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
-
-            total_pixels = float(new_w * new_h)
-            edge_pixels = float(np.count_nonzero(edges))
-            # Normalized edge density: typically 0.01 to 0.15 for real slope photos
-            raw_edge_density = edge_pixels / total_pixels
-            crack_density = min(1.0, round(raw_edge_density * 8.0, 3))
-            features["crack_density_index"] = crack_density
-
-            # 2. Bare Soil / Mudflow Exposure Ratio via HSV
-            hsv = cv2.cvtColor(resized, cv2.COLOR_BGR2HSV)
-            # Brown / Red-brown / Tan soil and rock mask
-            lower_soil = np.array([8, 30, 40], dtype=np.uint8)
-            upper_soil = np.array([28, 220, 200], dtype=np.uint8)
-            soil_mask = cv2.inRange(hsv, lower_soil, upper_soil)
-            soil_pixels = float(np.count_nonzero(soil_mask))
-            soil_exposure = min(1.0, round(soil_pixels / total_pixels, 3))
-            features["soil_exposure_ratio"] = soil_exposure
-
-            # 3. Composite Visual Hazard Score (0.0 to 1.0)
-            visual_score = round(0.60 * crack_density + 0.40 * soil_exposure, 2)
-            features["visual_hazard_score"] = visual_score
-
-            if visual_score >= 0.65:
-                features["dominant_visual_feature"] = "ACTIVE_FISSURE_SLOPE_EROSION"
-            elif visual_score >= 0.35:
-                features["dominant_visual_feature"] = "MODERATE_SURFACE_DISTURBANCE"
-            else:
-                features["dominant_visual_feature"] = "LOW_SURFACE_DEFORMATION"
-
-            return features
         except Exception:
             return features
 
