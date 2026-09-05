@@ -95,3 +95,15 @@ def get_sms_dispatch_history():
         "total_logged": len(SmsNotificationService.get_recent_dispatches()),
         "dispatches": SmsNotificationService.get_recent_dispatches()
     }
+
+@router.get("/delivery-status")
+def get_live_delivery_status(limit: int = 10):
+    """
+    Fetches real-time carrier delivery status directly from the Twilio Gateway.
+    Reports whether the mobile network delivered the SMS to the recipient's handset.
+    """
+    statuses = SmsNotificationService.get_live_delivery_statuses(limit=limit)
+    return {
+        "total": len(statuses),
+        "messages": statuses
+    }

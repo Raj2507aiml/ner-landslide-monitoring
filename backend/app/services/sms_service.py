@@ -162,6 +162,30 @@ class SmsNotificationService:
         return list(reversed(RECENT_DISPATCH_LOGS[-limit:]))
 
     @classmethod
+    def get_live_delivery_statuses(cls, limit: int = 10) -> List[Dict[str, Any]]:
+        """Queries the Twilio Gateway for real-time delivery status receipts from mobile carriers."""
+        client = cls.get_client()
+        if not client:
+            return []
+        try:
+            messages = client.messages.list(limit=limit)
+            return [
+                {
+                    "sid": m.sid,
+                    "to": m.to,
+                    "from": m.from_,
+                    "status": m.status,  # "delivered", "sent", "failed", "undelivered"
+                    "date_sent": m.date_sent.isoformat() if m.date_sent else None,
+                    "error_code": m.error_code,
+                    "error_message": m.error_message
+                }
+                for m in messages
+            ]
+        except Exception as e:
+            logger.error(f"[SMS] Failed to query live delivery status: {e}")
+            return []
+
+    @classmethod
     def _log_dispatch(cls, record: Dict[str, Any]) -> None:
         """Appends to the in-memory dispatch history."""
         RECENT_DISPATCH_LOGS.append(record)
