@@ -6,6 +6,7 @@ GeoJSON map layers, risk signals, review queue triage, status updates, and media
 """
 
 import os
+import json
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks, status as http_status
 from fastapi.responses import FileResponse
@@ -454,3 +455,55 @@ def update_admin_verification(
             detail=f"Field report with ID {report_id} not found."
         )
     return detail
+
+
+@router.post("/{report_id}/analyze", response_model=FieldReportDetailResponse)
+def trigger_report_ai_analysis(
+    report_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Triggers automated Aadhaar identity verification and Jio Tag predictive modeling
+    for an observation report, computing real-time landslide risk probabilities and visual surface metrics.
+    """
+    detail = FieldReportService.run_ai_analysis(db=db, report_id=report_id)
+    if not detail:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Field report with ID {report_id} not found."
+        )
+    return detail
+
+
+@router.get("/{report_id}/jio-tag-prediction")
+def get_report_jio_tag_prediction(
+    report_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Returns the comprehensive Jio Tag predictive modeling payload including spatial telemetry,
+    CV visual hazard features, DEM terrain context, and calibrated landslide risk probability.
+    """
+    report = FieldReportService.get_report_by_id(db=db, report_id=report_id)
+    if not report:
+        raise HTTPException(
+            status_code=http_status.HTTP_404_NOT_FOUND,
+            detail=f"Field report with ID {report_id} not found."
+        )
+
+    if report.prediction_details:
+        try:
+            return json.loads(report.prediction_details)
+        except Exception:
+            pass
+
+    # If not yet analyzed, run analysis on-demand
+    detail = FieldReportService.run_ai_analysis(db=db, report_id=report_id)
+    if detail and detail.prediction_details:
+        return detail.prediction_details
+
+    return {
+        "status": "NO_PREDICTION_DATA",
+        "message": "No Jio Tag photo or hazard media evidence attached to run prediction on."
+    }
+

@@ -40,5 +40,18 @@ class FieldReport(Base):
     verified_by = Column(String(120), nullable=True)
     verified_at = Column(DateTime, nullable=True)
 
+    # Automated Aadhaar Verification & AI Inspection
+    aadhaar_auto_status = Column(String(50), nullable=False, default="UNVERIFIED")  # GENUINE_VERIFIED | POTENTIAL_MISMATCH | INVALID_NOT_AADHAAR
+    aadhaar_verification_details = Column(Text, nullable=True)  # JSON payload with Verhoeff, QR, and name similarity
+
+    # Jio Tag Spatial Telemetry & Predictive Risk Features
+    jio_tag_latitude = Column(Float, nullable=True)
+    jio_tag_longitude = Column(Float, nullable=True)
+    jio_tag_altitude = Column(Float, nullable=True)
+    jio_tag_captured_at = Column(DateTime, nullable=True)
+    visual_hazard_score = Column(Float, nullable=True)  # 0.0 - 1.0 (from CV crack/mud analysis)
+    predicted_risk_score = Column(Float, nullable=True)  # 0 - 100 (calibrated landslide probability)
+    prediction_details = Column(Text, nullable=True)  # JSON payload with environmental & ML components
+
     # 1-to-many relationship with attached media evidence
     media = relationship("FieldReportMedia", back_populates="report", cascade="all, delete-orphan")

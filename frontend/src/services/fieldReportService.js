@@ -367,3 +367,68 @@ export function getAadhaarDocumentUrl(reportId, docType) {
   const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : '';
   return `${baseUrl}/v1/field-reports/${reportId}/aadhaar-document/${docType}${tokenQuery}`;
 }
+
+/**
+ * Triggers automated AI inspection on Aadhaar evidence and Jio Tag landslide risk modeling.
+ */
+export async function triggerAiAnalysis(reportId) {
+  try {
+    const response = await apiFetch(`/v1/field-reports/${reportId}/analyze`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        ok: false,
+        status: response.status,
+        error: errorData.detail || 'Failed to run AI analysis.',
+        data: null
+      };
+    }
+    const data = await response.json();
+    return {
+      ok: true,
+      status: response.status,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      error: 'Network error during AI analysis execution.',
+      data: null
+    };
+  }
+}
+
+/**
+ * Fetches comprehensive Jio Tag predictive modeling details.
+ */
+export async function getJioTagPrediction(reportId) {
+  try {
+    const response = await apiFetch(`/v1/field-reports/${reportId}/jio-tag-prediction`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        ok: false,
+        status: response.status,
+        error: errorData.detail || 'Failed to fetch Jio Tag prediction.',
+        data: null
+      };
+    }
+    const data = await response.json();
+    return {
+      ok: true,
+      status: response.status,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      error: 'Network error fetching prediction data.',
+      data: null
+    };
+  }
+}
+

@@ -25,14 +25,22 @@ import {
   Camera,
   Lock,
   RotateCcw,
-  Check
+  Check,
+  Cpu,
+  Sparkles,
+  Activity,
+  TrendingUp,
+  Gauge,
+  Fingerprint,
+  Scan
 } from 'lucide-react';
 import { 
   getReviewQueue, 
   getFieldReportById, 
   updateReportStatus,
   updateAdminVerification,
-  getAadhaarDocumentUrl
+  getAadhaarDocumentUrl,
+  triggerAiAnalysis
 } from '../services/fieldReportService';
 import { getMediaBaseUrl } from '../services/apiConfig';
 
@@ -85,6 +93,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
   const [verificationNote, setVerificationNote] = useState('');
   const [actionError, setActionError] = useState(null);
   const [actionSuccess, setActionSuccess] = useState(null);
+  const [isAnalyzingReport, setIsAnalyzingReport] = useState(false);
 
   // Lightbox preview for photos
   const [activePhotoUrl, setActivePhotoUrl] = useState(null);
@@ -219,6 +228,33 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
       }
     } else {
       setActionError(res.error || `Failed to update verification status to ${decisionStatus}.`);
+    }
+  };
+
+  // Handle On-Demand / Re-run AI Automated Verification & Jio Tag Landslide Prediction
+  const handleTriggerAiAnalysis = async () => {
+    if (!selectedReportId) return;
+
+    setIsAnalyzingReport(true);
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      const res = await triggerAiAnalysis(selectedReportId);
+      if (res.ok && res.data) {
+        setSelectedReportDetail(res.data);
+        setActionSuccess('AI Automated Verification & Landslide Predictive Modeling complete!');
+        if (onReportUpdated) {
+          onReportUpdated(res.data);
+        }
+        fetchQueue();
+      } else {
+        setActionError(res.error || 'Failed to complete AI analysis on evidence.');
+      }
+    } catch (err) {
+      setActionError('Error executing AI analysis.');
+    } finally {
+      setIsAnalyzingReport(false);
     }
   };
 
@@ -501,7 +537,28 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                           <span className="font-mono">{item.latitude.toFixed(3)}, {item.longitude.toFixed(3)}</span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          {item.predicted_risk_score != null && (
+                            <span 
+                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded font-mono font-bold text-[9.5px] ${
+                                item.predicted_risk_score >= 80 
+                                  ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' 
+                                  : item.predicted_risk_score >= 60 
+                                  ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+                                  : item.predicted_risk_score >= 30
+                                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                              }`} 
+                              title={`AI Predicted Landslide Risk: ${item.predicted_risk_score}%`}
+                            >
+                              ⚡ {Math.round(item.predicted_risk_score)}%
+                            </span>
+                          )}
+                          {item.aadhaar_auto_status === 'GENUINE_VERIFIED' && (
+                            <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title="Aadhaar Auto-Verified Genuine">
+                              <ShieldCheck className="h-2.5 w-2.5" /> ID
+                            </span>
+                          )}
                           {item.has_jio_tag_image && (
                             <span className="inline-flex items-center gap-0.5 text-emerald-500 font-semibold" title="Jio Tag Evidence Attached">
                               <Camera className="h-3 w-3" /> Jio
@@ -814,6 +871,243 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                       )}
                     </div>
 
+                  </div>
+
+                  {/* AI Automated Aadhaar Verification Card */}
+                  <div className="p-3.5 rounded-xl bg-[var(--subcard-bg)] border border-sky-500/30 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 rounded-md bg-sky-500/10 text-sky-400 border border-sky-500/30">
+                          <Fingerprint className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-main)] block">
+                            AI Automated Aadhaar Verification
+                          </span>
+                          <span className="text-[10px] text-[var(--text-dim)]">
+                            Sovereign multi-layer checksum & document inspection
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-2">
+                        {selectedReportDetail.aadhaar_auto_status === 'GENUINE_VERIFIED' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> GENUINE VERIFIED
+                          </span>
+                        ) : selectedReportDetail.aadhaar_auto_status === 'POTENTIAL_MISMATCH' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                            <AlertTriangle className="h-3 w-3" /> POTENTIAL MISMATCH
+                          </span>
+                        ) : selectedReportDetail.aadhaar_auto_status === 'INVALID_NOT_AADHAAR' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                            <XCircle className="h-3 w-3" /> INVALID / NOT AADHAAR
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full text-[10.5px] font-semibold bg-slate-500/15 text-slate-400 border border-slate-500/30">
+                            UNVERIFIED
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Aadhaar Audit Metrics Grid */}
+                    {(() => {
+                      const verifDetails = typeof selectedReportDetail.aadhaar_verification_details === 'string'
+                        ? JSON.parse(selectedReportDetail.aadhaar_verification_details || '{}')
+                        : (selectedReportDetail.aadhaar_verification_details || {});
+
+                      return (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            {/* 1. Verhoeff Checksum */}
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">Verhoeff D5 Checksum</span>
+                              <span className={`font-semibold text-[11px] flex items-center gap-1 mt-0.5 ${
+                                verifDetails.verhoeff_passed ? 'text-emerald-400' : 'text-rose-400'
+                              }`}>
+                                {verifDetails.verhoeff_passed ? 'Passed ✅' : 'Failed ❌'}
+                              </span>
+                            </div>
+
+                            {/* 2. UIDAI QR Payload */}
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">UIDAI QR Payload</span>
+                              <span className={`font-semibold text-[11px] flex items-center gap-1 mt-0.5 ${
+                                verifDetails.qr_detected ? 'text-emerald-400' : 'text-amber-400'
+                              }`}>
+                                {verifDetails.qr_detected ? (verifDetails.is_uidai_qr ? 'UIDAI XML Valid' : 'Decoded') : 'Not Detected'}
+                              </span>
+                            </div>
+
+                            {/* 3. Card Proportions */}
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">ID Framing Ratio</span>
+                              <span className={`font-semibold text-[11px] flex items-center gap-1 mt-0.5 ${
+                                verifDetails.card_proportions_valid ? 'text-emerald-400' : 'text-slate-400'
+                              }`}>
+                                {verifDetails.card_proportions_valid ? 'Standard (1.58)' : 'N/A or Custom'}
+                              </span>
+                            </div>
+
+                            {/* 4. Confidence Score */}
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">Confidence Rating</span>
+                              <span className="font-mono font-bold text-[11px] text-sky-400 flex items-center gap-1 mt-0.5">
+                                {verifDetails.confidence_score != null ? `${Math.round(verifDetails.confidence_score * 100)}%` : 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Verdict Summary / Audit Reasons */}
+                          {verifDetails.verdict_summary && (
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)]/80 border border-[var(--border-subtle)] text-[11px] text-[var(--text-main)]">
+                              <p className="font-medium text-emerald-400">{verifDetails.verdict_summary}</p>
+                              {verifDetails.audit_reasons && verifDetails.audit_reasons.length > 0 && (
+                                <ul className="mt-1 space-y-0.5 text-[10.5px] text-[var(--text-dim)] list-disc list-inside">
+                                  {verifDetails.audit_reasons.map((reason, idx) => (
+                                    <li key={idx}>{reason}</li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Jio Tag Predictive Modeling & Landslide Risk Assessment Panel */}
+                  <div className="p-3.5 rounded-xl bg-[var(--subcard-bg)] border border-emerald-500/40 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <Cpu className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-main)] block">
+                            Jio Tag Predictive Modeling & Landslide Risk Engine
+                          </span>
+                          <span className="text-[10px] text-[var(--text-dim)]">
+                            Multi-source fusion: Spatial EXIF telemetry + CV fissure density + ML susceptibility
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Re-run AI Analysis Button */}
+                      <button
+                        type="button"
+                        onClick={handleTriggerAiAnalysis}
+                        disabled={isAnalyzingReport}
+                        className="px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {isAnalyzingReport ? (
+                          <>
+                            <RefreshCw className="h-3 w-3 animate-spin" /> Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-3 w-3 text-emerald-400" /> Re-run AI Analysis
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {(() => {
+                      const pred = typeof selectedReportDetail.prediction_details === 'string'
+                        ? JSON.parse(selectedReportDetail.prediction_details || '{}')
+                        : (selectedReportDetail.prediction_details || {});
+
+                      const riskScore = selectedReportDetail.predicted_risk_score != null 
+                        ? selectedReportDetail.predicted_risk_score 
+                        : pred.calibrated_risk_score;
+
+                      const visualFeatures = pred.visual_features || {};
+                      const telemetry = pred.telemetry || {};
+                      const targetCoords = pred.target_coordinates || {};
+
+                      return (
+                        <div className="space-y-2.5">
+                          {/* Top Metric Strip: Risk Score + Risk Level */}
+                          <div className="p-3 rounded-xl bg-[var(--card-bg)] border border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`text-2xl font-mono font-extrabold ${
+                                (riskScore || 0) >= 80 ? 'text-rose-500' :
+                                (riskScore || 0) >= 60 ? 'text-orange-500' :
+                                (riskScore || 0) >= 30 ? 'text-amber-500' : 'text-emerald-500'
+                              }`}>
+                                {riskScore != null ? `${riskScore.toFixed(1)}%` : 'Pending Analysis'}
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-[var(--text-dim)] uppercase block font-semibold">Calibrated Landslide Probability</span>
+                                <span className="text-xs font-bold text-[var(--text-main)]">
+                                  {pred.risk_level ? `${pred.risk_level} Hazard Risk` : 'Ready for AI Evaluation'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Telemetry Pills */}
+                            <div className="flex flex-wrap items-center gap-2 text-[10.5px] font-mono">
+                              <span className="px-2 py-1 rounded bg-[var(--subcard-bg)] border border-[var(--border-subtle)] text-[var(--text-main)]">
+                                Lat: {targetCoords.latitude || selectedReportDetail.latitude?.toFixed(4)}, Lon: {targetCoords.longitude || selectedReportDetail.longitude?.toFixed(4)}
+                              </span>
+                              {targetCoords.altitude != null && (
+                                <span className="px-2 py-1 rounded bg-[var(--subcard-bg)] border border-[var(--border-subtle)] text-sky-400">
+                                  Alt: {targetCoords.altitude}m
+                                </span>
+                              )}
+                              <span className="px-2 py-1 rounded bg-[var(--subcard-bg)] border border-[var(--border-subtle)] text-emerald-400">
+                                Source: {targetCoords.source || 'REPORT_PIN'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Computer Vision Surface Features & Environmental Drivers */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">Visual Hazard Score</span>
+                              <span className="font-mono font-bold text-emerald-400 block mt-0.5">
+                                {selectedReportDetail.visual_hazard_score != null ? selectedReportDetail.visual_hazard_score : (visualFeatures.visual_hazard_score ?? '0.0')} / 1.0
+                              </span>
+                            </div>
+
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">Crack / Fissure Density</span>
+                              <span className="font-mono font-bold text-sky-400 block mt-0.5">
+                                {visualFeatures.crack_density_index != null ? `${(visualFeatures.crack_density_index * 100).toFixed(1)}%` : '0.0%'}
+                              </span>
+                            </div>
+
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">Soil & Debris Exposure</span>
+                              <span className="font-mono font-bold text-amber-400 block mt-0.5">
+                                {visualFeatures.soil_exposure_ratio != null ? `${(visualFeatures.soil_exposure_ratio * 100).toFixed(1)}%` : '0.0%'}
+                              </span>
+                            </div>
+
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)]">
+                              <span className="text-[9.5px] text-[var(--text-dim)] uppercase block">Surface Classification</span>
+                              <span className="font-semibold text-[10.5px] text-[var(--text-main)] truncate block mt-0.5">
+                                {visualFeatures.dominant_visual_feature || 'NORMAL_SURFACE'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Predictive Summary Text Box */}
+                          {pred.predictive_summary ? (
+                            <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 text-[11px] text-[var(--text-main)] leading-relaxed">
+                              <span className="font-semibold text-emerald-400 block mb-0.5">AI Synthesis:</span>
+                              {pred.predictive_summary}
+                            </div>
+                          ) : (
+                            <div className="p-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-subtle)] text-[10.5px] text-[var(--text-dim)] flex items-center justify-between">
+                              <span>No predictive run executed yet for this report. Click "Re-run AI Analysis" to evaluate.</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Verification Note & Admin Review Actions */}

@@ -8,6 +8,7 @@ review queues for managing citizen and field official hazard intelligence report
 import os
 import io
 import uuid
+import json
 import hashlib
 from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
@@ -38,7 +39,8 @@ from app.services.field_report_spatial_service import (
 )
 from app.services.field_report_media_service import (
     FieldReportMediaService,
-    compute_exif_consistency
+    compute_exif_consistency,
+    MEDIA_ROOT_DIR
 )
 
 # Secure Documents Storage Configuration
@@ -74,12 +76,34 @@ class FieldReportService:
         """
         masked_aadhaar = None
         aadhaar_hash = None
+        aadhaar_auto_status = "UNVERIFIED"
+        aadhaar_verification_details = None
+
         if report_in.aadhaar_number:
             raw_aadhaar = "".join(c for c in report_in.aadhaar_number if c.isdigit())
             if len(raw_aadhaar) != 12:
                 raise ValueError("Aadhaar Number must contain exactly 12 numeric digits.")
             masked_aadhaar = f"XXXX-XXXX-{raw_aadhaar[-4:]}"
             aadhaar_hash = hashlib.sha256(raw_aadhaar.encode("utf-8")).hexdigest()
+
+            from app.services.aadhaar_verification_service import AadhaarVerificationService
+            verhoeff_valid = AadhaarVerificationService.validate_verhoeff(raw_aadhaar)
+            if verhoeff_valid:
+                aadhaar_auto_status = "UNVERIFIED"
+                aadhaar_verification_details = json.dumps({
+                    "verhoeff_passed": True,
+                    "auto_status": "UNVERIFIED",
+                    "confidence_score": 0.40,
+                    "audit_reasons": ["12-digit Aadhaar number passed Verhoeff checksum algorithm."]
+                })
+            else:
+                aadhaar_auto_status = "INVALID_NOT_AADHAAR"
+                aadhaar_verification_details = json.dumps({
+                    "verhoeff_passed": False,
+                    "auto_status": "INVALID_NOT_AADHAAR",
+                    "confidence_score": 0.0,
+                    "audit_reasons": ["12-digit Aadhaar number failed Verhoeff checksum algorithm."]
+                })
 
         db_report = FieldReport(
             report_type=report_in.report_type.value,
@@ -93,6 +117,8 @@ class FieldReportService:
             aadhaar_number=masked_aadhaar,
             aadhaar_hash=aadhaar_hash,
             verification_status="PENDING",
+            aadhaar_auto_status=aadhaar_auto_status,
+            aadhaar_verification_details=aadhaar_verification_details,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
@@ -175,6 +201,20 @@ class FieldReportService:
 
         obs_status, conf = get_evidence_semantics(report.status)
 
+        aadhaar_details_dict = None
+        if report.aadhaar_verification_details:
+            try:
+                aadhaar_details_dict = json.loads(report.aadhaar_verification_details)
+            except Exception:
+                aadhaar_details_dict = None
+
+        prediction_details_dict = None
+        if report.prediction_details:
+            try:
+                prediction_details_dict = json.loads(report.prediction_details)
+            except Exception:
+                prediction_details_dict = None
+
         return FieldReportDetailResponse(
             id=report.id,
             report_type=report.report_type,
@@ -196,6 +236,15 @@ class FieldReportService:
             has_aadhaar_qr=bool(report.aadhaar_qr_path and os.path.exists(report.aadhaar_qr_path)),
             has_jio_tag_image=bool(report.jio_tag_image_path),
             jio_tag_image_url=report.jio_tag_image_path,
+            aadhaar_auto_status=report.aadhaar_auto_status or "UNVERIFIED",
+            aadhaar_verification_details=aadhaar_details_dict,
+            jio_tag_latitude=report.jio_tag_latitude,
+            jio_tag_longitude=report.jio_tag_longitude,
+            jio_tag_altitude=report.jio_tag_altitude,
+            jio_tag_captured_at=report.jio_tag_captured_at,
+            visual_hazard_score=report.visual_hazard_score,
+            predicted_risk_score=report.predicted_risk_score,
+            prediction_details=prediction_details_dict,
             media=media_responses,
             spatial_context=SpatialContextDetails(
                 nearby_reports_count=nearby_count,
@@ -334,7 +383,10 @@ class FieldReportService:
                 verification_note=r.verification_note,
                 has_aadhaar_card=bool(r.aadhaar_card_path),
                 has_aadhaar_qr=bool(r.aadhaar_qr_path),
-                has_jio_tag_image=bool(r.jio_tag_image_path)
+                has_jio_tag_image=bool(r.jio_tag_image_path),
+                aadhaar_auto_status=r.aadhaar_auto_status or "UNVERIFIED",
+                predicted_risk_score=r.predicted_risk_score,
+                visual_hazard_score=r.visual_hazard_score
             ))
 
         return ReviewQueueResponse(
@@ -408,6 +460,7 @@ class FieldReportService:
                 raise HTTPException(status_code=400, detail=f"Failed to read {label}: {str(e)}")
 
         # 1. Process Jio Tag photo if provided
+        jio_tag_saved_path = None
         if jio_tag_file and jio_tag_file.filename:
             media_resp = await FieldReportMediaService.process_and_save_media(
                 db=db,
@@ -415,6 +468,7 @@ class FieldReportService:
                 file=jio_tag_file
             )
             report.jio_tag_image_path = media_resp.media_url
+            jio_tag_saved_path = os.path.join(MEDIA_ROOT_DIR, f"report_{report_id}", media_resp.stored_filename)
 
         # 2. Process Aadhaar Card if provided
         if aadhaar_card_file and aadhaar_card_file.filename:
@@ -434,10 +488,124 @@ class FieldReportService:
                 f.write(qr_bytes)
             report.aadhaar_qr_path = qr_path
 
+        # 4. Automated Aadhaar Verification & AI Inspection
+        if report.aadhaar_card_path or report.aadhaar_qr_path or report.aadhaar_number:
+            try:
+                from app.services.aadhaar_verification_service import AadhaarVerificationService
+                aadhaar_verif = AadhaarVerificationService.verify_aadhaar_evidence(
+                    aadhaar_number=report.aadhaar_number,
+                    full_name=report.full_name,
+                    card_image_path=report.aadhaar_card_path,
+                    qr_image_path=report.aadhaar_qr_path
+                )
+                report.aadhaar_auto_status = aadhaar_verif.get("auto_status", "UNVERIFIED")
+                report.aadhaar_verification_details = json.dumps(aadhaar_verif)
+            except Exception:
+                pass
+
+        # 5. Jio Tag Telemetry & Landslide Risk Prediction
+        if not jio_tag_saved_path and report.jio_tag_image_path:
+            url_suffix = report.jio_tag_image_path.replace("/static/media/field_reports/", "").strip("/\\")
+            cand_path = os.path.join(MEDIA_ROOT_DIR, url_suffix)
+            if os.path.exists(cand_path):
+                jio_tag_saved_path = cand_path
+
+        if jio_tag_saved_path and os.path.exists(jio_tag_saved_path):
+            try:
+                from app.services.jio_tag_prediction_service import JioTagPredictionService
+                prediction = JioTagPredictionService.extract_and_predict(
+                    db=db,
+                    image_path=jio_tag_saved_path,
+                    fallback_lat=report.latitude,
+                    fallback_lon=report.longitude
+                )
+                report.jio_tag_latitude = prediction.get("target_coordinates", {}).get("latitude")
+                report.jio_tag_longitude = prediction.get("target_coordinates", {}).get("longitude")
+                report.jio_tag_altitude = prediction.get("target_coordinates", {}).get("altitude")
+                captured_at_str = prediction.get("telemetry", {}).get("captured_at")
+                if captured_at_str:
+                    try:
+                        report.jio_tag_captured_at = datetime.fromisoformat(captured_at_str)
+                    except Exception:
+                        pass
+                report.visual_hazard_score = prediction.get("visual_features", {}).get("visual_hazard_score")
+                report.predicted_risk_score = prediction.get("calibrated_risk_score")
+                report.prediction_details = json.dumps(prediction)
+            except Exception:
+                pass
+
         report.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(report)
         return report
+
+    @classmethod
+    def run_ai_analysis(cls, db: Session, report_id: int) -> Optional[FieldReportDetailResponse]:
+        """
+        Executes automated Aadhaar verification inspection and Jio Tag predictive modeling
+        for a given field report. If no dedicated Jio Tag was provided, analyzes the first attached media photo.
+        """
+        report = db.query(FieldReport).filter(FieldReport.id == report_id).first()
+        if not report:
+            return None
+
+        # 1. Run Aadhaar Verification if identity fields exist
+        if report.aadhaar_card_path or report.aadhaar_qr_path or report.aadhaar_number:
+            try:
+                from app.services.aadhaar_verification_service import AadhaarVerificationService
+                aadhaar_verif = AadhaarVerificationService.verify_aadhaar_evidence(
+                    aadhaar_number=report.aadhaar_number,
+                    full_name=report.full_name,
+                    card_image_path=report.aadhaar_card_path,
+                    qr_image_path=report.aadhaar_qr_path
+                )
+                report.aadhaar_auto_status = aadhaar_verif.get("auto_status", "UNVERIFIED")
+                report.aadhaar_verification_details = json.dumps(aadhaar_verif)
+            except Exception:
+                pass
+
+        # 2. Locate hazard image for prediction
+        eval_image_path = None
+        if report.jio_tag_image_path:
+            url_suffix = report.jio_tag_image_path.replace("/static/media/field_reports/", "").strip("/\\")
+            cand_path = os.path.join(MEDIA_ROOT_DIR, url_suffix)
+            if os.path.exists(cand_path):
+                eval_image_path = cand_path
+
+        if not eval_image_path and report.media:
+            first_m = report.media[0]
+            cand_path = os.path.join(MEDIA_ROOT_DIR, f"report_{report_id}", first_m.stored_filename)
+            if os.path.exists(cand_path):
+                eval_image_path = cand_path
+
+        if eval_image_path and os.path.exists(eval_image_path):
+            try:
+                from app.services.jio_tag_prediction_service import JioTagPredictionService
+                prediction = JioTagPredictionService.extract_and_predict(
+                    db=db,
+                    image_path=eval_image_path,
+                    fallback_lat=report.latitude,
+                    fallback_lon=report.longitude
+                )
+                report.jio_tag_latitude = prediction.get("target_coordinates", {}).get("latitude")
+                report.jio_tag_longitude = prediction.get("target_coordinates", {}).get("longitude")
+                report.jio_tag_altitude = prediction.get("target_coordinates", {}).get("altitude")
+                captured_at_str = prediction.get("telemetry", {}).get("captured_at")
+                if captured_at_str:
+                    try:
+                        report.jio_tag_captured_at = datetime.fromisoformat(captured_at_str)
+                    except Exception:
+                        pass
+                report.visual_hazard_score = prediction.get("visual_features", {}).get("visual_hazard_score")
+                report.predicted_risk_score = prediction.get("calibrated_risk_score")
+                report.prediction_details = json.dumps(prediction)
+            except Exception:
+                pass
+
+        report.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(report)
+        return cls.get_report_detail(db=db, report_id=report_id)
 
     @classmethod
     def get_secure_document_path(cls, db: Session, report_id: int, doc_type: str) -> Optional[str]:

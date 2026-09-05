@@ -48,6 +48,15 @@ def migrate_db(db_engine):
                 ("verification_note", "TEXT"),
                 ("verified_by", "VARCHAR(120)"),
                 ("verified_at", "DATETIME"),
+                ("aadhaar_auto_status", "VARCHAR(50) DEFAULT 'UNVERIFIED'"),
+                ("aadhaar_verification_details", "TEXT"),
+                ("jio_tag_latitude", "FLOAT"),
+                ("jio_tag_longitude", "FLOAT"),
+                ("jio_tag_altitude", "FLOAT"),
+                ("jio_tag_captured_at", "DATETIME"),
+                ("visual_hazard_score", "FLOAT"),
+                ("predicted_risk_score", "FLOAT"),
+                ("prediction_details", "TEXT"),
             ]
 
             for col_name, col_type in columns_to_add:

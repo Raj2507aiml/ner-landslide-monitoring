@@ -104,6 +104,17 @@ class FieldReportResponse(BaseModel):
     has_aadhaar_qr: Optional[bool] = False
     has_jio_tag_image: Optional[bool] = False
     jio_tag_image_url: Optional[str] = None
+    # Automated Aadhaar Verification & AI Inspection
+    aadhaar_auto_status: Optional[str] = "UNVERIFIED"
+    aadhaar_verification_details: Optional[Dict[str, Any]] = None
+    # Jio Tag Spatial Telemetry & Predictive Risk Features
+    jio_tag_latitude: Optional[float] = None
+    jio_tag_longitude: Optional[float] = None
+    jio_tag_altitude: Optional[float] = None
+    jio_tag_captured_at: Optional[datetime] = None
+    visual_hazard_score: Optional[float] = None
+    predicted_risk_score: Optional[float] = None
+    prediction_details: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True
@@ -238,6 +249,9 @@ class ReviewQueueItemResponse(BaseModel):
     has_aadhaar_card: Optional[bool] = False
     has_aadhaar_qr: Optional[bool] = False
     has_jio_tag_image: Optional[bool] = False
+    aadhaar_auto_status: Optional[str] = "UNVERIFIED"
+    predicted_risk_score: Optional[float] = None
+    visual_hazard_score: Optional[float] = None
 
     class Config:
         from_attributes = True

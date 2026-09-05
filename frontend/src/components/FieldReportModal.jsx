@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   X, 
@@ -24,6 +24,40 @@ import {
   uploadFieldReportMedia, 
   uploadVerificationDocuments 
 } from '../services/fieldReportService';
+
+// Verhoeff algorithm matrices for mathematical 12-digit Aadhaar checksum validation
+const VERHOEFF_D = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 2, 3, 4, 0, 6, 7, 8, 9, 5],
+  [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
+  [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
+  [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
+  [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
+  [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
+  [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
+  [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+];
+const VERHOEFF_P = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+  [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
+  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+  [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
+  [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
+  [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
+];
+
+function validateVerhoeff(numStr) {
+  if (!numStr || numStr.length !== 12) return false;
+  let c = 0;
+  const reversed = numStr.split('').reverse();
+  for (let i = 0; i < reversed.length; i++) {
+    c = VERHOEFF_D[c][VERHOEFF_P[i % 8][parseInt(reversed[i], 10)]];
+  }
+  return c === 0;
+}
 
 const REPORT_TYPES = [
   { value: 'CRACK', label: 'Ground Crack / Fissure', desc: 'Tension cracks, surface openings, road fissures' },
@@ -129,6 +163,11 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
     const raw = e.target.value.replace(/\D/g, '').slice(0, 12);
     setAadhaarDigits(raw);
   };
+
+  const isAadhaarChecksumValid = useMemo(() => {
+    if (!aadhaarDigits || aadhaarDigits.length !== 12) return false;
+    return validateVerhoeff(aadhaarDigits);
+  }, [aadhaarDigits]);
 
   const getMaskedAadhaarPreview = () => {
     if (!aadhaarDigits) return 'XXXX-XXXX-XXXX';
@@ -307,6 +346,10 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
       }
       if (aadhaarDigits.length !== 12) {
         setErrorMessage('Aadhaar number must contain exactly 12 numeric digits.');
+        return;
+      }
+      if (!validateVerhoeff(aadhaarDigits)) {
+        setErrorMessage('Invalid Aadhaar number: Failed mathematical Verhoeff checksum algorithm. Please verify the 12 digits on your Aadhaar card.');
         return;
       }
       if (!jioTagFile) {
@@ -746,9 +789,15 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                         </label>
                         <div className="flex items-center gap-1.5 text-[10.5px] font-mono">
                           {aadhaarDigits.length === 12 ? (
-                            <span className="text-emerald-500 font-bold flex items-center gap-1">
-                              <Check className="h-3 w-3" /> 12 Digits Validated
-                            </span>
+                            isAadhaarChecksumValid ? (
+                              <span className="text-emerald-400 font-bold flex items-center gap-1 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30">
+                                <Check className="h-3 w-3" /> Verhoeff Validated ✅
+                              </span>
+                            ) : (
+                              <span className="text-rose-400 font-bold flex items-center gap-1 bg-rose-950/40 px-2 py-0.5 rounded border border-rose-500/30">
+                                <AlertTriangle className="h-3 w-3" /> Invalid Checksum ⚠️
+                              </span>
+                            )
                           ) : (
                             <span className="text-amber-500">
                               {aadhaarDigits.length}/12 digits
