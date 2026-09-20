@@ -32,6 +32,13 @@ export default function UserRoleSelector({
   const isAdmin = currentUser?.role === USER_ROLES.ADMIN;
   const isCitizen = currentUser?.role === USER_ROLES.CITIZEN;
 
+  const rawName = currentUser?.name || '';
+  const displayName = (isAdmin || rawName.includes('Sanjeev') || rawName.includes('Roy'))
+    ? 'Aryan Raj'
+    : (isCitizen || rawName.includes('Pema') || rawName.includes('Tashi') || !rawName)
+    ? 'Raj Gupta'
+    : rawName;
+
   const handleSignOut = () => {
     logoutUser();
     if (onUserChange) onUserChange(null);
@@ -54,14 +61,14 @@ export default function UserRoleSelector({
             ? 'bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20'
             : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20'
         }`}
-        title={`Signed in as ${currentUser.name} (${currentUser.role})`}
+        title={`Signed in as ${displayName} (${currentUser.role})`}
       >
         <span className="text-sm">{currentUser.avatar || (isAdmin ? '🛡️' : '👤')}</span>
         <div className="flex flex-col text-left leading-none hidden sm:flex">
           <span className={`text-[10px] font-bold tracking-wider uppercase truncate max-w-[120px] ${
             isAdmin ? 'text-rose-400' : 'text-emerald-400'
           }`}>
-            {currentUser.name}
+            {displayName}
           </span>
           <span className="text-[9px] text-[var(--text-dim)] font-mono">
             {isAdmin ? 'OFFICIAL ADMIN' : 'PUBLIC CITIZEN'}
@@ -93,7 +100,7 @@ export default function UserRoleSelector({
             </div>
 
             <p className="font-bold text-xs text-[var(--text-main)] truncate">
-              {currentUser.name}
+              {displayName}
             </p>
             <p className="text-[10.5px] font-mono text-[var(--text-muted)] truncate">
               {currentUser.email}

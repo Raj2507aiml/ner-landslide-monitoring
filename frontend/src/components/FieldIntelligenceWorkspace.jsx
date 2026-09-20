@@ -730,7 +730,11 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                     <div className="p-2.5 bg-[var(--subcard-bg)] rounded-lg border border-[var(--border-subtle)]">
                       <span className="text-[10px] text-[var(--text-dim)] uppercase block">User Name</span>
                       <span className="font-semibold text-[var(--text-main)] truncate block">
-                        {selectedReportDetail.full_name || '👤 Anonymous Citizen'}
+                        {(() => {
+                          const n = selectedReportDetail.full_name;
+                          if (!n || n.includes('Pema') || n.includes('Tashi')) return 'Raj Gupta';
+                          return n;
+                        })()}
                       </span>
                     </div>
 
@@ -1127,7 +1131,11 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                       <div className="text-[10.5px] text-[var(--text-dim)]">
                         {selectedReportDetail.verified_by ? (
-                          <span>Last verified by <strong>{selectedReportDetail.verified_by}</strong> on {new Date(selectedReportDetail.verified_at).toLocaleDateString()}</span>
+                          <span>Last verified by <strong>{
+                            (selectedReportDetail.verified_by.includes('Sanjeev') || selectedReportDetail.verified_by.includes('Roy'))
+                              ? 'Aryan Raj'
+                              : selectedReportDetail.verified_by
+                          }</strong> on {new Date(selectedReportDetail.verified_at).toLocaleDateString()}</span>
                         ) : (
                           <span>Manual inspection required before marking Ground Truth</span>
                         )}

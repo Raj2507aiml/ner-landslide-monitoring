@@ -55,7 +55,7 @@ import EmergencySmsModal from './components/EmergencySmsModal'
 import { useOnlineStatus } from './hooks/useOnlineStatus'
 import LanguageSwitcher from './components/LanguageSwitcher'
 import { useTranslation } from './services/i18nService'
-import { getCurrentUser, USER_ROLES, switchUserRole, DEMO_USERS, logoutUser } from './services/authService'
+import { getCurrentUser, USER_ROLES, switchUserRole, DEMO_USERS, logoutUser, sanitizeUserProfile } from './services/authService'
 import { analyzeLocation, searchSatelliteData, getSatelliteSceneDetail, processSatelliteScene, getWeatherTelemetry, processTerrainData, fetchNearbyHistoricalLandslides, fetchSusceptibilityScore, fetchStaticMLSusceptibility, fetchCompositeLandslideRisk, fetchAutomaticSatelliteChange, fetchEarlyWarningAnalysis } from './services/locationService'
 import { getNearbyFieldReports, getFieldIntelligenceSummary, getReviewQueue } from './services/fieldReportService'
 import { getNearbyRoads, getRoadDisruptionSummary } from './services/infrastructureService'
@@ -104,10 +104,10 @@ function App() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const urlRole = urlParams.get('role');
-      if (urlRole?.toLowerCase() === 'citizen') return DEMO_USERS.CITIZEN;
-      if (urlRole?.toLowerCase() === 'admin') return DEMO_USERS.ADMIN;
+      if (urlRole?.toLowerCase() === 'citizen') return sanitizeUserProfile(DEMO_USERS.CITIZEN);
+      if (urlRole?.toLowerCase() === 'admin') return sanitizeUserProfile(DEMO_USERS.ADMIN);
     } catch {}
-    return getCurrentUser();
+    return sanitizeUserProfile(getCurrentUser());
   })
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false)
   const [loginModalTab, setLoginModalTab] = useState('USER_LOGIN')
@@ -164,8 +164,9 @@ function App() {
   }, [currentUser]);
 
   const handleAuthSuccess = (user) => {
-    setCurrentUser(user);
-    if (user?.role === USER_ROLES.ADMIN) {
+    const sanitized = sanitizeUserProfile(user);
+    setCurrentUser(sanitized);
+    if (sanitized?.role === USER_ROLES.ADMIN) {
       window.location.hash = '#admin';
     } else {
       window.location.hash = '#dashboard';
@@ -3621,7 +3622,7 @@ function App() {
         initialTab={loginModalTab}
         onClose={() => setIsLoginModalOpen(false)}
         onLoginSuccess={(user) => {
-          setCurrentUser(user)
+          setCurrentUser(sanitizeUserProfile(user))
           setIsLoginModalOpen(false)
         }}
       />
