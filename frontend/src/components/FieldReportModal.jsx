@@ -89,7 +89,7 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
   // Media files state: array of { id, file, previewUrl, name, size }
   const [selectedFiles, setSelectedFiles] = useState([]);
   
-  // Jio Tag Evidence & Citizen Aadhaar Verification State
+  // Geo Tag Evidence & Citizen Aadhaar Verification State
   const [includeJioTagVerification, setIncludeJioTagVerification] = useState(true);
   const [fullName, setFullName] = useState('');
   const [aadhaarDigits, setAadhaarDigits] = useState('');
@@ -180,11 +180,11 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
     const file = e.target.files?.[0];
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) {
-      setErrorMessage(`Jio Tag photo '${file.name}' is not supported. Only JPEG, PNG, and WebP are allowed.`);
+      setErrorMessage(`Geo Tag photo '${file.name}' is not supported. Only JPEG, PNG, and WebP are allowed.`);
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
-      setErrorMessage(`Jio Tag photo exceeds the 10 MB size limit.`);
+      setErrorMessage(`Geo Tag photo exceeds the 10 MB size limit.`);
       return;
     }
     setErrorMessage(null);
@@ -338,7 +338,7 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
       return;
     }
 
-    // Jio Tag & Aadhaar Verification Validations
+    // Geo Tag & Aadhaar Verification Validations
     if (includeJioTagVerification) {
       if (!fullName.trim() || fullName.trim().length < 2) {
         setErrorMessage('Please provide citizen Full Name (as per Aadhaar).');
@@ -353,7 +353,7 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
         return;
       }
       if (!jioTagFile) {
-        setErrorMessage('Please upload the Jio Tag photographic evidence.');
+        setErrorMessage('Please upload the Geo Tag photographic evidence.');
         return;
       }
       if (!aadhaarCardFile) {
@@ -393,9 +393,9 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
     const createdReport = createResult.data;
     const reportId = createdReport.id;
 
-    // Step 2: Upload Confidential Verification Documents & Jio Tag
+    // Step 2: Upload Confidential Verification Documents & Geo Tag
     if (includeJioTagVerification && (jioTagFile || aadhaarCardFile || aadhaarQrFile)) {
-      setSubmitProgressText('Uploading Jio Tag & securing private Aadhaar documents...');
+      setSubmitProgressText('Uploading Geo Tag & securing private Aadhaar documents...');
       const verifResult = await uploadVerificationDocuments(reportId, {
         jioTagFile,
         aadhaarCardFile,
@@ -734,7 +734,7 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                 </div>
               </div>
 
-              {/* Field 6: Jio Tag Evidence & Citizen Aadhaar Verification */}
+              {/* Field 6: Geo Tag Evidence & Citizen Aadhaar Verification */}
               <div className="space-y-3 p-4 rounded-xl bg-[var(--subcard-bg)] border border-emerald-500/30">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -743,13 +743,13 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider flex items-center gap-1.5">
-                        Jio Tag Evidence & Aadhaar Verification
+                        Geo Tag Evidence & Aadhaar Verification
                         <span className="px-1.5 py-0.5 rounded text-[9.5px] font-semibold bg-emerald-500/20 text-emerald-500 border border-emerald-500/40">
                           Ground Truth Evidence
                         </span>
                       </h3>
                       <p className="text-[11px] text-[var(--text-dim)]">
-                        Attach mandatory Jio Tag photo, Aadhaar card & QR for verified triage
+                        Attach mandatory Geo Tag photo, Aadhaar card & QR for verified triage
                       </p>
                     </div>
                   </div>
@@ -823,12 +823,12 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                       </div>
                     </div>
 
-                    {/* 3 Upload Cards: Jio Tag Image, Aadhaar Card, Aadhaar QR */}
+                    {/* 3 Upload Cards: Geo Tag Image, Aadhaar Card, Aadhaar QR */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                      {/* Jio Tag Image */}
+                      {/* Geo Tag Image */}
                       <div className="space-y-1.5">
                         <label className="block text-[11px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-                          1. Jio Tag Image *
+                          1. Geo Tag Image *
                         </label>
                         <div 
                           onClick={() => jioTagInputRef.current?.click()}
@@ -836,7 +836,7 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                         >
                           {jioTagPreview ? (
                             <>
-                              <img src={jioTagPreview} alt="Jio Tag Preview" className="w-full h-full object-cover rounded-lg" />
+                              <img src={jioTagPreview} alt="Geo Tag Preview" className="w-full h-full object-cover rounded-lg" />
                               <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold">
                                 Change Photo
                               </div>
@@ -844,7 +844,7 @@ export default function FieldReportModal({ isOpen, onClose, selectedLocation, on
                           ) : (
                             <div className="space-y-1">
                               <Camera className="h-5 w-5 mx-auto text-emerald-500" />
-                              <span className="text-[10px] font-semibold text-[var(--text-main)] block">Upload Jio Tag Photo</span>
+                              <span className="text-[10px] font-semibold text-[var(--text-main)] block">Upload Geo Tag Photo</span>
                               <span className="text-[9px] text-[var(--text-dim)] block">Geo-tagged hazard</span>
                             </div>
                           )}

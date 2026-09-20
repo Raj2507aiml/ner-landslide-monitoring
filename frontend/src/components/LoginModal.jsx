@@ -345,7 +345,7 @@ export default function LoginModal({
                       type="text"
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
-                      placeholder="e.g. Raj Gupta / Pema Tashi"
+                      placeholder="e.g. Raj Gupta"
                       className="w-full bg-[var(--subcard-bg)] border border-[var(--border-subtle)] focus:border-emerald-500 rounded-lg px-3 py-1.5 text-xs text-[var(--text-main)] outline-none"
                       required
                     />

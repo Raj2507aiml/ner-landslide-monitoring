@@ -197,7 +197,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
     }
   }, [selectedReportDetail]);
 
-  // Handle Admin Verification Decision (Jio Tag & Aadhaar manual review)
+  // Handle Admin Verification Decision (Geo Tag & Aadhaar manual review)
   const handleAdminVerificationAction = async (decisionStatus) => {
     if (!selectedReportId) return;
 
@@ -214,7 +214,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
       } else if (decisionStatus === 'REJECTED') {
         setActionSuccess(`Observation rejected. Citizen verification marked as REJECTED.`);
       } else if (decisionStatus === 'RE_UPLOAD_REQUIRED') {
-        setActionSuccess(`Status set to Re-upload Required. Submitter notified to provide clearer Aadhaar / Jio Tag evidence.`);
+        setActionSuccess(`Status set to Re-upload Required. Submitter notified to provide clearer Aadhaar / Geo Tag evidence.`);
       }
 
       // Refresh detailed view & queue
@@ -231,7 +231,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
     }
   };
 
-  // Handle On-Demand / Re-run AI Automated Verification & Jio Tag Landslide Prediction
+  // Handle On-Demand / Re-run AI Automated Verification & Geo Tag Landslide Prediction
   const handleTriggerAiAnalysis = async () => {
     if (!selectedReportId) return;
 
@@ -560,12 +560,12 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                             </span>
                           )}
                           {item.has_jio_tag_image && (
-                            <span className="inline-flex items-center gap-0.5 text-emerald-500 font-semibold" title="Jio Tag Evidence Attached">
-                              <Camera className="h-3 w-3" /> Jio
+                            <span className="inline-flex items-center gap-0.5 text-emerald-500 font-semibold" title="Geo Tag Evidence Attached">
+                              <Camera className="h-3 w-3" /> Geo
                             </span>
                           )}
                           {item.verification_status === 'VERIFIED' && (
-                            <span className="inline-flex items-center gap-0.5 text-emerald-500 font-bold" title="Identity & Jio Tag Verified">
+                            <span className="inline-flex items-center gap-0.5 text-emerald-500 font-bold" title="Identity & Geo Tag Verified">
                               <Check className="h-3 w-3" /> ID
                             </span>
                           )}
@@ -696,14 +696,14 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                   </div>
                 </div>
 
-                {/* Section 3: Jio Tag Evidence & Citizen Aadhaar Verification */}
+                {/* Section 3: Geo Tag Evidence & Citizen Aadhaar Verification */}
                 <div className="space-y-4 bg-[var(--card-bg)] p-4 rounded-xl border border-emerald-500/30">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="text-xs font-bold text-[var(--text-main)] uppercase tracking-wider flex items-center gap-2">
                       <div className="p-1 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
                         <ShieldCheck className="h-4 w-4" />
                       </div>
-                      <span>Jio Tag Evidence & Citizen Identity Verification</span>
+                      <span>Geo Tag Evidence & Citizen Identity Verification</span>
                     </label>
 
                     {/* Verification Status Badge */}
@@ -749,14 +749,14 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                     </div>
                   </div>
 
-                  {/* Evidence Inspection Trio: Jio Tag Photo, Aadhaar Card, Aadhaar QR */}
+                  {/* Evidence Inspection Trio: Geo Tag Photo, Aadhaar Card, Aadhaar QR */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     
-                    {/* Jio Tag Image */}
+                    {/* Geo Tag Image */}
                     <div className="space-y-1.5">
                       <span className="text-[10.5px] font-semibold text-[var(--text-dim)] uppercase tracking-wider flex items-center justify-between">
                         <span className="flex items-center gap-1">
-                          <Camera className="h-3 w-3 text-emerald-500" /> Jio Tag Photo
+                          <Camera className="h-3 w-3 text-emerald-500" /> Geo Tag Photo
                         </span>
                         {selectedReportDetail.has_jio_tag_image && (
                           <span className="text-[9.5px] text-emerald-500 font-bold">Attached</span>
@@ -770,7 +770,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                         >
                           <img 
                             src={`${getMediaBaseUrl()}${selectedReportDetail.jio_tag_image_url}`} 
-                            alt="Jio Tag Evidence"
+                            alt="Geo Tag Evidence"
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-1.5 text-white text-xs font-semibold">
@@ -780,7 +780,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                       ) : (
                         <div className="h-40 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--subcard-bg)] flex flex-col items-center justify-center p-3 text-center text-[var(--text-dim)] text-xs">
                           <Camera className="h-6 w-6 mb-1 text-[var(--text-dim)]" />
-                          <span>No Jio Tag photo provided</span>
+                          <span>No Geo Tag photo provided</span>
                         </div>
                       )}
                     </div>
@@ -978,7 +978,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                     })()}
                   </div>
 
-                  {/* Jio Tag Predictive Modeling & Landslide Risk Assessment Panel */}
+                  {/* Geo Tag Predictive Modeling & Landslide Risk Assessment Panel */}
                   <div className="p-3.5 rounded-xl bg-[var(--subcard-bg)] border border-emerald-500/40 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -987,7 +987,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                         </div>
                         <div>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-main)] block">
-                            Jio Tag Predictive Modeling & Landslide Risk Engine
+                            Geo Tag Predictive Modeling & Landslide Risk Engine
                           </span>
                           <span className="text-[10px] text-[var(--text-dim)]">
                             Multi-source fusion: Spatial EXIF telemetry + CV fissure density + ML susceptibility
@@ -1118,7 +1118,7 @@ export default function FieldIntelligenceWorkspace({ isOpen, onClose, onReportUp
                     <textarea 
                       value={verificationNote}
                       onChange={(e) => setVerificationNote(e.target.value)}
-                      placeholder="Add official verification note (e.g. Jio Tag photo confirmed matching slope fissure; Aadhaar identity validated)..."
+                      placeholder="Add official verification note (e.g. Geo Tag photo confirmed matching slope fissure; Aadhaar identity validated)..."
                       rows={2}
                       maxLength={1000}
                       className="w-full px-3 py-2 rounded-xl bg-[var(--subcard-bg)] border border-[var(--border-subtle)] text-[var(--text-main)] text-xs placeholder:text-[var(--text-dim)] focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition resize-none"

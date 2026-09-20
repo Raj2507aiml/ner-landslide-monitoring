@@ -20,7 +20,7 @@ export const DEMO_USERS = {
   ADMIN: {
     id: 'USR-CMD-01',
     username: 'admin',
-    name: 'Col. Sanjeev Roy (Retd.)',
+    name: 'Aryan Raj',
     email: 'commander@ner.gov.in',
     role: USER_ROLES.ADMIN,
     designation: 'Joint Director & Incident Commander',
@@ -31,7 +31,7 @@ export const DEMO_USERS = {
   CITIZEN: {
     id: 'USR-CIT-01',
     username: 'citizen',
-    name: 'Pema Tashi',
+    name: 'Raj Gupta',
     email: 'citizen@ner.gov.in',
     role: USER_ROLES.CITIZEN,
     designation: 'Community Member / Local Observer',
@@ -83,7 +83,7 @@ export function getRegisteredUsers() {
   return [
     {
       id: 'USR-CIT-01',
-      name: 'Pema Tashi',
+      name: 'Raj Gupta',
       email: 'citizen@ner.gov.in',
       password: 'password123',
       phone: '+91 98765 43210',

@@ -381,7 +381,7 @@ export default function AuthLandingPage({ onLoginSuccess, initialPortal = 'USER'
                     required
                     value={regName}
                     onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Pema Tashi"
+                    placeholder="e.g. Raj Gupta"
                     className="w-full px-3 py-2 text-xs bg-[var(--card-bg)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -539,7 +539,7 @@ export default function AuthLandingPage({ onLoginSuccess, initialPortal = 'USER'
                   className="px-2.5 py-1 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-medium transition cursor-pointer flex items-center gap-1.5"
                 >
                   <User className="h-3 w-3" />
-                  <span>{t('citizen_demo_tag', 'Pema Tashi (Citizen)')}</span>
+                  <span>{t('citizen_demo_tag', 'Raj Gupta (Citizen)')}</span>
                 </button>
 
                 <button
@@ -548,7 +548,7 @@ export default function AuthLandingPage({ onLoginSuccess, initialPortal = 'USER'
                   className="px-2.5 py-1 rounded-md bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 text-[11px] font-medium transition cursor-pointer flex items-center gap-1.5"
                 >
                   <Shield className="h-3 w-3" />
-                  <span>{t('admin_demo_tag', 'Col. Sanjeev Roy (Admin)')}</span>
+                  <span>{t('admin_demo_tag', 'Aryan Raj (Admin)')}</span>
                 </button>
               </div>
             </div>

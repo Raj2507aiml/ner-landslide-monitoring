@@ -142,8 +142,8 @@ export const TRANSLATIONS = {
     register_button: 'Create Citizen Account & Enter',
     admin_login_button: 'Authenticate Commander Access',
     demo_credentials_title: '1-Click Verification Test Credentials:',
-    citizen_demo_tag: 'Pema Tashi (Citizen)',
-    admin_demo_tag: 'Col. Sanjeev Roy (Admin)',
+    citizen_demo_tag: 'Raj Gupta (Citizen)',
+    admin_demo_tag: 'Aryan Raj (Admin)',
 
     // Citizen Advisory Card & Telemetry
     public_safety_guide: 'Public Safety Guide',
@@ -472,8 +472,8 @@ export const TRANSLATIONS = {
     register_button: 'Account Bonai Kena Ghusibi',
     admin_login_button: 'Commander Login Confirm Kuribi',
     demo_credentials_title: '1-Click Test Account:',
-    citizen_demo_tag: 'Pema Tashi (Citizen)',
-    admin_demo_tag: 'Col. Sanjeev Roy (Admin)',
+    citizen_demo_tag: 'Raj Gupta (Citizen)',
+    admin_demo_tag: 'Aryan Raj (Admin)',
 
     public_safety_guide: 'Manu Khan Nimite Safety Rules',
     ner_hill_corridors: 'North East Pahar Rasta & Highway',

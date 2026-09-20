@@ -274,7 +274,7 @@ export async function updateReportStatus(reportId, newStatus) {
 }
 
 /**
- * Uploads Jio Tag image and confidential Aadhaar verification documents.
+ * Uploads Geo Tag image and confidential Aadhaar verification documents.
  */
 export async function uploadVerificationDocuments(reportId, { jioTagFile = null, aadhaarCardFile = null, aadhaarQrFile = null } = {}) {
   try {
@@ -372,7 +372,7 @@ export function getAadhaarDocumentUrl(reportId, docType) {
 }
 
 /**
- * Triggers automated AI inspection on Aadhaar evidence and Jio Tag landslide risk modeling.
+ * Triggers automated AI inspection on Aadhaar evidence and Geo Tag landslide risk modeling.
  */
 export async function triggerAiAnalysis(reportId) {
   try {
@@ -405,7 +405,7 @@ export async function triggerAiAnalysis(reportId) {
 }
 
 /**
- * Fetches comprehensive Jio Tag predictive modeling details.
+ * Fetches comprehensive Geo Tag predictive modeling details.
  */
 export async function getJioTagPrediction(reportId) {
   try {
@@ -415,7 +415,7 @@ export async function getJioTagPrediction(reportId) {
       return {
         ok: false,
         status: response.status,
-        error: errorData.detail || 'Failed to fetch Jio Tag prediction.',
+        error: errorData.detail || 'Failed to fetch Geo Tag prediction.',
         data: null
       };
     }
